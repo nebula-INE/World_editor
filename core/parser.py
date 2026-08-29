@@ -48,9 +48,17 @@ class ParseIssue:
 
 
 @dataclass
+class NaturalLine:
+    """Primary Parserがどの構文にもマッチせず無視した行。Secondary Indexerの入力になる。"""
+    line: int
+    text: str
+
+
+@dataclass
 class ParseResult:
     model: WorldModel
     issues: list[ParseIssue]
+    natural_lines: list[NaturalLine]
 
 
 def parse_codex_syntax(text: str) -> ParseResult:
@@ -63,12 +71,14 @@ def parse_codex_syntax(text: str) -> ParseResult:
     """
     model = WorldModel()
     issues: list[ParseIssue] = []
+    natural_lines: list[NaturalLine] = []
 
     for lineno, raw_line in enumerate(text.splitlines(), start=1):
         line = raw_line.strip()
         if not line:
             continue
         # コードフェンスや見出しなど、明らかにCodex Syntaxでない行は早期スキップ
+        # (Secondary Indexerの対象にもしない — 見出し/コードブロックは地の文ではない)
         if line.startswith("#") or line.startswith("```"):
             continue
 
@@ -112,6 +122,7 @@ def parse_codex_syntax(text: str) -> ParseResult:
             continue
 
         # どの構文にもマッチしない行は無視する。
-        # (自然言語の地の文として扱われる。Phase 1.5でCandidate抽出対象になる)
+        # (自然言語の地の文として扱われる。Phase 1.5のSecondary Indexerに渡す)
+        natural_lines.append(NaturalLine(line=lineno, text=line))
 
-    return ParseResult(model=model, issues=issues)
+    return ParseResult(model=model, issues=issues, natural_lines=natural_lines)
