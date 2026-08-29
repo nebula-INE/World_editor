@@ -10,16 +10,35 @@ AI/NLPには依存せず、明示的な Codex Syntax のみを解釈します（
 | Phase 0a: Entity/Relation 最小Schema | `core/models.py` |
 | Phase 1: 決定論的Primary Parser | `core/parser.py` |
 | Phase 1: Live Preview (§4.6) | `main.py`（デバウンス付きtextChanged） |
+| Phase 1.5: Secondary Indexer（自然言語→Candidate, Rule-basedのみ, §4.5.1） | `core/indexer.py` |
+| Phase 1.5: Inline Suggestions / User Confirmation (§4.3.1) | `ui/candidate_panel.py` |
 | Phase 2: Graph Canvas（読み取り専用の最小版） | `ui/graph_view.py` |
 | Relation Status (§7.1) の線種表現 | 実装済み（confirmed=実線 / hypothetical=破線 / rumor=点線） |
 | Reality vs Knowledge 拡張点 (§7.2.1) | `Relation.perspective` フィールドとして予約済み（未使用） |
 | Schema Versioning (§18.8) | `schema_version` フィールドとして予約済み |
 
 **スコープ外**（今後のPhaseで追加）:
-- Secondary / Background Indexer（自然言語からのCandidate抽出, Phase 1.5）
-- Canvas編集・Non-destructive Text Sync・Patch/Conflict UI（Phase 2本編）
+- Confidence算出へのEmbedding Signal / LLM Signalの追加（§4.5.1、Phase 1.5後半）
+- Canvas編集・Non-destructive Text Sync本編・Patch/Conflict UI（Phase 2本編）
 - Timeline / Layer / World State / Snapshot（Phase 3, MVP4）
 - Worldbuilding Linter（Phase 4）
+
+## Secondary Indexer（自然言語からのCandidate抽出）の仕組み
+
+- 既知のEntity名/aliasの部分文字列一致で「Entity mention」を検出（形態素解析なし、素朴な方式）。
+- 固定辞書（`RELATION_KEYWORDS`）にある関係キーワードが1文に見つかり、既知Entityの言及が
+  ちょうど2つある場合にCandidateを1件生成する。
+- Confidenceは Rule-based Signal のみで算出（§4.5.1でMVP2として定めた方針どおり）:
+  entity一致 + keyword一致 + 語順ボーナス − 否定表現ペナルティ − 曖昧性ペナルティ。
+- 3つ以上のEntityが1文に登場する場合は「曖昧」として通知しつつ、隣接ペアごとに
+  低confidenceの候補を出す。代名詞（彼/それ等）で先行詞が特定できない場合は
+  Candidateを生成せず、Unresolved Referenceとして通知するのみ（§15.6に準拠、Errorにはしない）。
+- Accept を押すと、Canonical Dataを直接書き換えるのではなく、本文末尾の
+  `# Generated Relations` セクションへ確定Codex Syntax行（例: `A -> B : 所属`）を
+  追記し、それをPrimary Parserに再解釈させる（§10.1 Generated Sectionの考え方を流用。
+  本格的なPatchシステムはPhase 2で実装）。
+- Ignore を押した候補は、セッション中は同じ行・同じ候補内容であれば再表示されない
+  （テキストにもCanonical Dataにも一切影響しない）。
 
 ## セットアップ
 
@@ -62,12 +81,11 @@ axral_codex/
     └── graph_view.py      # Graph Canvasの最小描画 (QGraphicsScene)
 ```
 
-## 次にやると良いこと（Phase 1.5以降）
+## 次にやると良いこと（Phase 2以降）
 
-1. `core/indexer.py` を新設し、Secondary Indexer（自然言語→Candidate抽出）を
-   Primary Parserと完全に分離した形で追加する（§4.3）。まずRule-based Confidence
-   のみ（§4.5.1）。
-2. `ui/graph_view.py` にノードのドラッグ移動とCanvas→Text Patch書き出しを追加し、
-   Phase 2 (Non-destructive Text Sync) へ接続する。
-3. `core/models.py` に Event / WorldState / Snapshot を追加し（Phase 0b, §9）、
+1. `ui/graph_view.py` にノードのドラッグ移動とCanvas→Text Patch書き出しを追加し、
+   Phase 2 (Non-destructive Text Sync本編・Patch/Conflict UI) へ接続する。
+2. `core/models.py` に Event / WorldState / Snapshot を追加し（Phase 0b, §9）、
    Timeline Lens (Phase 3) の土台にする。
+3. `core/indexer.py` のConfidence算出にEmbedding Signalを追加し（§4.5.1後半）、
+   `confidence_breakdown`のembedding_signalフィールドを実際に埋める。
