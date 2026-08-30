@@ -29,7 +29,9 @@ Canvas → Patch → Conflict のフロー:
      比較する。一致すればPatchを適用、食い違えば§11のConflictとして報告する
      (Human-authored Text > Generated Patch, §18.4)。
   4. Conflictが検出されると、メニューの「Patches > Resolve Conflicts...」から
-     [Keep Text] [Apply Canvas Change] [Open Diff] を選んで解消できる。
+     [Keep Text] [Apply Canvas Change] [Merge] [Open Diff] を選んで解消できる。
+     [Merge] は単一フィールドの値の食い違いに対し、ユーザーが最終値を
+     自分で入力する形で実装している (§11.3、詳細はREADME参照)。
 ---------------------------------------------------------------------------
 
 Background Processing (§4.4) の原則に対応し、Primary Parserは
@@ -68,6 +70,17 @@ Timeline Lens (§14) UIを接続する。
     テキストで差分を示す。ノードを2枚並べるフル版のBefore/After Viewは
     今回のスコープ外 (README参照)。
 ---------------------------------------------------------------------------
+
+--- Phase 4 追記 ---------------------------------------------------------
+Worldbuilding Linter (§15) を接続する。
+  - core/linter.py の lint() が、Parser issue / Patch conflict /
+    Secondary Indexerのambiguity / WorldStateEngineに対する新規チェック
+    (Temporal Contradiction, Relation Date Contradiction, Missing Reference)
+    をひとつのリストに集約する。
+  - 結果はLinterPanel (ui/linter_panel.py) にそのまま表示する。
+    Linterはテキストやデータを一切書き換えない (読み取り専用の検証)。
+  - 毎回の再パース(_reparse)のたびに自動的に再実行する。
+---------------------------------------------------------------------------
 """
 
 from __future__ import annotations
@@ -80,6 +93,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QDockWidget,
     QFileDialog,
+    QInputDialog,
     QMainWindow,
     QMessageBox,
     QPlainTextEdit,
@@ -90,11 +104,13 @@ from PySide6.QtWidgets import (
 
 from core.events import Effect, new_event
 from core.indexer import index_natural_lines
+from core.linter import lint
 from core.models import WorldModel
 from core.parser import extract_relation_type, parse_codex_syntax
 from core.world_state import WorldStateEngine
 from ui.candidate_panel import CandidatePanel
 from ui.graph_view import GraphView
+from ui.linter_panel import LinterPanel
 from ui.timeline_panel import AddEventDialog, TimelinePanel
 
 GENERATED_SECTION_HEADING = "# Generated Relations"
@@ -153,6 +169,14 @@ class MainWindow(QMainWindow):
         timeline_dock = QDockWidget("Timeline Lens (Phase 3, §14)", self)
         timeline_dock.setWidget(self.timeline_panel)
         self.addDockWidget(Qt.BottomDockWidgetArea, timeline_dock)
+
+        self.linter_panel = LinterPanel()
+        self.linter_panel.issue_activated.connect(self._jump_to_line)
+        linter_dock = QDockWidget("Worldbuilding Linter (Phase 4, §15)", self)
+        linter_dock.setWidget(self.linter_panel)
+        self.addDockWidget(Qt.BottomDockWidgetArea, linter_dock)
+        self.tabifyDockWidget(timeline_dock, linter_dock)
+        timeline_dock.raise_()
 
         # World State Engine (Phase 0b実装済み)。Initial Stateは再パースのたびに
         # 最新のCanonical Dataへ同期する (_reparse内で set_initial_model)。
@@ -267,7 +291,23 @@ class MainWindow(QMainWindow):
                 f"⚠ Patch conflicts: {len(result.patch_conflicts)} "
                 f"(Patches > Resolve Conflicts...)"
             )
+
+        lint_issues = lint(result, self.world_engine, index_result)
+        self.linter_panel.set_issues(lint_issues)
+        if lint_issues:
+            status_parts.append(f"Linter: {len(lint_issues)} issue(s)")
+
         self.status.showMessage("  ".join(status_parts))
+
+    def _jump_to_line(self, line: int) -> None:
+        """LinterPanelの項目をダブルクリックすると該当行にカーソルを移動する。"""
+        block = self.editor.document().findBlockByNumber(max(0, line - 1))
+        if not block.isValid():
+            return
+        cursor = self.editor.textCursor()
+        cursor.setPosition(block.position())
+        self.editor.setTextCursor(cursor)
+        self.editor.setFocus()
 
     @staticmethod
     def _signature(candidate) -> tuple:
@@ -536,6 +576,7 @@ class MainWindow(QMainWindow):
         )
         keep_btn = box.addButton("Keep Text", QMessageBox.AcceptRole)
         apply_btn = box.addButton("Apply Canvas Change", QMessageBox.AcceptRole)
+        merge_btn = box.addButton("Merge", QMessageBox.AcceptRole)
         diff_btn = box.addButton("Open Diff", QMessageBox.ActionRole)
         box.addButton("Skip", QMessageBox.RejectRole)
         box.exec()
@@ -545,6 +586,8 @@ class MainWindow(QMainWindow):
             self._remove_patch_block(conflict.ref_key)
         elif clicked is apply_btn:
             self._apply_canvas_change(conflict)
+        elif clicked is merge_btn:
+            self._merge_conflict(conflict)
         elif clicked is diff_btn:
             QMessageBox.information(
                 self,
@@ -555,30 +598,72 @@ class MainWindow(QMainWindow):
         # Skip: 何もしない (次回再パース時にも同じConflictとして残る)
 
     def _apply_canvas_change(self, conflict) -> None:
+        """[Apply Canvas Change]: PatchのほうをOriginal Textへそのまま反映する。"""
+        if self._write_value_to_original(conflict, conflict.patch_value):
+            self._remove_patch_block(conflict.ref_key)
+
+    def _merge_conflict(self, conflict) -> None:
         """
-        [Apply Canvas Change]: PatchのほうをOriginal Textへ直接反映し、
-        Patchブロックは (もう不要になったので) 削除する。
+        [Merge] (§11.3): OriginalとPatch、どちらか一方を機械的に採用するのではなく、
+        ユーザーが両者を見比べたうえで最終的な値を自分で決められるようにする。
+
+        今回のConflictは単一フィールド(type等)の値の食い違いであり、複数行テキストの
+        マージのような「部分的に両方を取り込む」操作は意味を持たない
+        (2つの文字列の一部ずつを継ぎ合わせても大抵は無意味な値になる)。そのため、
+        ここでのMergeは「両方の値を提示したうえで、ユーザーが最終値を入力する」
+        という形にする — 単純な二択(Keep Text / Apply Canvas Change)では
+        「PatchでもOriginalでもない、第三の正しい値」を選べないケースに対応する。
+        """
+        merged_value, ok = QInputDialog.getText(
+            self,
+            "Merge",
+            f"「{conflict.ref_key}」の {conflict.field} を統合します。\n\n"
+            f"Original: {conflict.text_value}\n"
+            f"Patch:    {conflict.patch_value}\n\n"
+            f"最終的に採用する値を入力してください:",
+            text=conflict.patch_value,
+        )
+        if not ok:
+            return
+        merged_value = merged_value.strip()
+        if not merged_value:
+            QMessageBox.warning(self, "Merge", "空の値は適用できません。")
+            return
+        if self._write_value_to_original(conflict, merged_value):
+            self._remove_patch_block(conflict.ref_key)
+
+    def _write_value_to_original(self, conflict, value: str) -> bool:
+        """
+        Original Textの該当行 (§18.1 で保護されているHuman-authored Text) に
+        指定した値を直接書き込む。[Apply Canvas Change] と [Merge] の両方が使う
+        共通処理。書き込みに成功したかどうかを返す。
         """
         model = self._last_result.model if self._last_result else None
         relation = model.find_by_ref_key(conflict.ref_key) if model else None
         if relation is None or not relation.source_refs:
             QMessageBox.warning(self, "Conflicts", "対象のRelationが見つかりませんでした。")
-            return
+            return False
 
         target_line_no = relation.source_refs[0].line
         lines = self.editor.toPlainText().splitlines()
         idx = target_line_no - 1
-        if 0 <= idx < len(lines):
-            updated, n = re.subn(
-                r":\s*" + re.escape(conflict.text_value) + r"\s*$",
-                f": {conflict.patch_value}",
-                lines[idx],
-            )
-            if n > 0:
-                lines[idx] = updated
-                self.editor.setPlainText("\n".join(lines))
+        if not (0 <= idx < len(lines)):
+            return False
 
-        self._remove_patch_block(conflict.ref_key)
+        updated, n = re.subn(
+            r":\s*" + re.escape(conflict.text_value) + r"\s*$",
+            f": {value}",
+            lines[idx],
+        )
+        if n == 0:
+            QMessageBox.warning(
+                self, "Conflicts", "本文の該当箇所を特定できませんでした (手動で編集してください)。"
+            )
+            return False
+
+        lines[idx] = updated
+        self.editor.setPlainText("\n".join(lines))
+        return True
 
 
 def main() -> None:

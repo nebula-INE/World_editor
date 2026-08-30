@@ -18,12 +18,18 @@ AI/NLPには依存せず、明示的な Codex Syntax のみを解釈します（
 | Phase 1.5: Inline Suggestions / User Confirmation (§4.3.1) | `ui/candidate_panel.py` |
 | Phase 2: Graph Canvas（ノードのドラッグ移動） | `ui/graph_view.py` |
 | Phase 2: Non-destructive Text Sync（Generated Section + PATCH, §10） | `core/parser.py`（PATCH解釈）/ `main.py`（PATCH書き込み） |
-| Phase 2: Conflict検出・Resolution UI（§11） | `core/parser.py`（PatchConflict検出）/ `main.py`（Resolve Conflicts...） |
+| Phase 2: Conflict検出・Resolution UI（§11、Keep Text/Apply Canvas Change/**Merge**/Open Diffの4択） | `core/parser.py`（PatchConflict検出）/ `main.py`（Resolve Conflicts...） |
 | Phase 3: Timelineスクラバー（WorldStateEngineを操作するUI, §14） | `ui/timeline_panel.py` |
 | Phase 3: Layer Slider（§13） | `ui/timeline_panel.py`（フィルタUI）/ `ui/graph_view.py`（`visible_layers`） |
 | Phase 3: Entity宣言へのLayer指定構文 `[名前:型:Layer]` | `core/parser.py` |
 | Phase 3: Event追加/削除UI（Add Event Dialog） | `ui/timeline_panel.py` / `main.py` |
 | Phase 3: Before/After View（最小版・Change Summaryテキスト） | `main.py`（`_compute_change_summary`） |
+| Phase 4: Worldbuilding Linter — Temporal Contradiction (§15.1) | `core/linter.py`（`_temporal_contradictions`） |
+| Phase 4: Relation Date Contradiction（§15.3の最小版） | `core/linter.py`（`_relation_date_inconsistencies`） |
+| Phase 4: Missing Reference（§15.4） | `core/linter.py`（`_missing_references_over_time`） |
+| Phase 4: Duplicate Entity（§15.5、型不一致の重複宣言） | `core/parser.py`（Entity宣言時に検出） |
+| Phase 4: Ambiguity（§15.6）の集約表示 | `core/linter.py`（Secondary Indexerの結果を統合） |
+| Phase 4: Linter結果パネル | `ui/linter_panel.py` |
 | Relation Status (§7.1) の線種表現 | 実装済み（confirmed=実線 / hypothetical=破線 / rumor=点線） |
 | Reality vs Knowledge 拡張点 (§7.2.1) | `Relation.perspective` フィールドとして予約済み（未使用） |
 | Schema Versioning (§18.8) | `schema_version` フィールドとして予約済み |
@@ -32,7 +38,9 @@ AI/NLPには依存せず、明示的な Codex Syntax のみを解釈します（
 - Confidence算出へのEmbedding Signal / LLM Signalの追加（§4.5.1、Phase 1.5後半）
 - Infinite Canvas最適化・Undo/Redo（Phase 2の残り・Phase 5）
 - ノードを2枚並べるフル版のBefore/After View（現状はテキストによる変化サマリのみ）
-- Worldbuilding Linter（Phase 4）
+- Membership Contradiction（§15.2）: join/leave専用のEffectが未実装のため見送り（詳細は後述）
+- 一般的なRelation Contradiction（§15.3）: 関係の対義語辞書などドメインオントロジーが
+  必要な部分は未実装。現状はvalid_from/valid_toの数値矛盾のみ検出
 
 ## Secondary Indexer（自然言語からのCandidate抽出）の仕組み
 
@@ -98,6 +106,12 @@ Phase 3でLayer Slider・Before/After Viewと合わせて接続する想定。
   - **Keep Text**: Patchブロックを削除し、Original Textの値を正とする
   - **Apply Canvas Change**: Original Textの該当行をPatchの値で直接書き換え、
     不要になったPatchブロックを削除する（§11.3の `[Apply Canvas Change]` に対応）
+  - **Merge**: OriginalとPatch、両方の値を提示したうえで、ユーザーが最終的に
+    採用する値を自分で入力する（§11.3の `[Merge]`）。今回のConflictは
+    Relationの単一フィールド(type等)の値の食い違いであり、複数行テキストの
+    ような「部分的に両方を取り込む」自動マージには意味がないため、
+    「OriginalでもPatchでもない第三の値」も選べる形にしている。
+    入力した値はOriginal Textへ直接書き込まれ、Patchブロックは削除される。
   - **Open Diff**: OriginalとPatchの差分を表示してから、改めて選択させる
 - CRDTによるリアルタイム共同編集（§11.4）はMVPでは未実装（plan.mdの方針どおり）。
 
@@ -117,6 +131,38 @@ Phase 3でLayer Slider・Before/After Viewと合わせて接続する想定。
   （例: `[A:Character:Su-ken]`）。Layer未指定のEntityは常に表示される。
 - Timelineで追加したEventはテキストやCanonical Dataには一切保存されない
   （現状はアプリのセッション内メモリのみ。永続化は将来の拡張）。
+
+## Worldbuilding Linter（Phase 4）の仕組み
+
+画面下部の「Worldbuilding Linter」パネル（Timeline Lensとタブ切り替え）に、
+再パースのたびに自動実行されたLint結果が一覧表示される。項目をダブルクリック
+すると、対応する行がある場合エディタがその行にジャンプする。
+
+集約している内容:
+- **Parser issue**（未知のLayer、Patch対象が見つからない等）
+- **Patch Conflict**（§11、Patches > Resolve Conflicts...で解消可能）
+- **Ambiguity**（§15.6、Secondary Indexerの未解決参照・複数Entity曖昧文）
+- **Temporal Contradiction**（§15.1、新規実装）: `entity_existence`が
+  死亡系の値（dead/deceased/destroyed/died）になった後のtimestampで、
+  そのEntityが別のEventに参加している場合に検出する。復活
+  （existenceが非死亡値に戻る）があればその時点で区間を閉じる。
+- **Relation Date Contradiction**（§15.3の最小版、新規実装）:
+  Relationの`valid_from`/`valid_to`が両方とも数値として解釈でき、
+  `valid_to < valid_from`になっている場合に検出する。
+- **Missing Reference**（§15.4、新規実装）: `relation_add` Effectが、
+  適用時点のWorld Stateに存在しないEntityを参照している場合に検出する。
+- **Duplicate Entity**（§15.5、新規実装）: 同じ名前のEntityが異なる型で
+  複数回明示宣言された場合に検出する（後発の宣言は無視され、その旨を通知）。
+
+意図的に実装していないこと:
+- **Membership Contradiction**（§15.2）: 「参加/離脱」を表す専用のEffect
+  kind（例: `membership_join` / `membership_leave`）がまだ無く、現在の
+  Event追加UIは`entity_existence`と`relation_status`のみをサポートしている。
+  Effect語彙を拡張すれば同じ`core/linter.py`にチェックを追加できる設計。
+- **一般的なRelation Contradiction**（§15.3）: 「対立」と「同盟」が同時に
+  confirmedである、といった意味的な矛盾の検出には関係の対義語辞書のような
+  ドメインオントロジーが必要で、plan.md自体もここは詳細化していないため、
+  スキーマから機械的に判定できる日付の矛盾のみに絞っている。
 
 ## セットアップ
 
@@ -155,31 +201,31 @@ Patches メニューから:
 
 ```
 axral_codex/
-├── main.py                 # アプリ本体 (Editor + Graph View + Timeline Lens)
+├── main.py                 # アプリ本体 (Editor + Graph View + Timeline Lens + Linter)
 ├── core/
 │   ├── models.py            # Canonical Data Model (Entity, Relation, WorldModel, Layer, Reference System)
-│   ├── parser.py             # Primary Parser (Codex Syntax + PATCH)
+│   ├── parser.py             # Primary Parser (Codex Syntax + PATCH + Duplicate Entity検出)
 │   ├── indexer.py            # Secondary Indexer (自然言語→Candidate, Rule-based)
 │   ├── events.py             # Event Schema
-│   └── world_state.py        # World State Engine (Initial State + Events, Snapshot)
+│   ├── world_state.py        # World State Engine (Initial State + Events, Snapshot)
+│   └── linter.py             # Worldbuilding Linter (§15)
 └── ui/
     ├── graph_view.py          # Graph Canvas (ドラッグ移動 + Relation編集)
     ├── candidate_panel.py      # Inline Suggestions / User Confirmation
-    └── timeline_panel.py       # Timeline Lens UI (スクラバー、Layer Slider、Event管理)
+    ├── timeline_panel.py       # Timeline Lens UI (スクラバー、Layer Slider、Event管理)
+    └── linter_panel.py         # Linter結果パネル
 ```
 
-## 次にやると良いこと（Phase 4以降）
+## 次にやると良いこと（Phase 5以降）
 
-1. Temporal Contradiction Linter (§15.1) を `core/world_state.py` の上に構築する。
-   例: `entity_existence="dead"` になった後の`timestamp`で、そのEntityが
-   `participants`に含まれるEventが存在すれば矛盾として検出できる
-   （Entity/Relationのsource_refsも活用して該当行を指し示せる）。
+1. Membership Contradiction（§15.2）向けに `membership_join` / `membership_leave`
+   Effect kindを`core/events.py`・`core/world_state.py`に追加し、
+   `core/linter.py`にチェックを実装する。
 2. `core/indexer.py` のConfidence算出にEmbedding Signalを追加し（§4.5.1後半）、
    `confidence_breakdown`のembedding_signalフィールドを実際に埋める。
-3. Conflict Resolution UIの `[Merge]` は現状 `[Apply Canvas Change]` /
-   `[Keep Text]` の二択に簡略化している。差分の一部だけを取り込む
-   本格的なMergeはPhase 2の残タスク。
-4. Timelineで追加したEventをCodex Syntaxとして本文に永続化する構文
+3. Timelineで追加したEventをCodex Syntaxとして本文に永続化する構文
    （例: `EVENT t=100 Death: A.existence = "dead"` のような形）を設計し、
    セッションをまたいでもEventが失われないようにする。
-5. ノードを2枚並べるフル版のBefore/After View（現状はテキストサマリのみ）。
+4. ノードを2枚並べるフル版のBefore/After View（現状はテキストサマリのみ）。
+5. Incremental Parsing・Viewport Culling等のLarge Scale Performance対応（Phase 5、
+   plan.md §12）。現状は全文を毎回再解析する素朴な実装。
