@@ -171,10 +171,29 @@ def parse_codex_syntax(text: str) -> ParseResult:
 
         m = _ENTITY_DECL_RE.match(line)
         if m:
+            name = m.group("name").strip()
+            declared_type = m.group("type").strip()
             layer = (m.group("layer") or "").strip() or None
+
+            existing = model.resolve(name)
+            if existing is not None and existing.type not in ("Unknown", declared_type):
+                # §15.5 Duplicate Entity: 型が食い違う重複宣言。
+                # get_or_create_entityは最初の型を維持し、後発の型は無視するため、
+                # ここで「無視された」ことを利用者に明示する。
+                issues.append(
+                    ParseIssue(
+                        line=lineno,
+                        message=(
+                            f"Duplicate Entity宣言: 「{name}」は既に型 "
+                            f"'{existing.type}' として宣言されています "
+                            f"(この行の型 '{declared_type}' は無視されました)"
+                        ),
+                    )
+                )
+
             entity = model.get_or_create_entity(
-                name=m.group("name").strip(),
-                type_=m.group("type").strip(),
+                name=name,
+                type_=declared_type,
                 source_ref=ref,
             )
             if layer:
