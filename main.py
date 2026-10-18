@@ -108,6 +108,7 @@ from core.indexer import index_natural_lines
 from core.linter import lint
 from core.models import WorldModel
 from core.parser import extract_relation_type, parse_codex_syntax
+from core.project import build_project, parse_project
 from core.world_state import WorldStateEngine
 from ui.candidate_panel import CandidatePanel
 from ui.graph_view import GraphView
@@ -273,15 +274,13 @@ class MainWindow(QMainWindow):
         )
         if not path:
             return
-        project = {
-            "format": "axral-world-project",
-            "schema_version": 1,
-            "text": self.editor.toPlainText(),
-            "events": [event.to_dict() for event in self.world_engine.events_sorted()],
-            "graph_positions": self.graph_view.export_positions(),
-            "timeline": self.timeline_panel.export_project_state(),
-            "ignored_candidates": [list(signature) for signature in sorted(self._ignored_signatures, key=repr)],
-        }
+        project = build_project(
+            self.editor.toPlainText(),
+            self.world_engine.events_sorted(),
+            self.graph_view.export_positions(),
+            self.timeline_panel.export_project_state(),
+            [list(signature) for signature in sorted(self._ignored_signatures, key=repr)],
+        )
         try:
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(project, f, ensure_ascii=False, indent=2)
@@ -299,21 +298,7 @@ class MainWindow(QMainWindow):
         try:
             with open(path, "r", encoding="utf-8") as f:
                 project = json.load(f)
-            if not isinstance(project, dict) or project.get("format") != "axral-world-project":
-                raise ValueError("Axral World Project形式ではありません。")
-            if project.get("schema_version") != 1:
-                raise ValueError(f"未対応のプロジェクトschema_versionです: {project.get('schema_version')!r}")
-            if not isinstance(project.get("text"), str):
-                raise ValueError("textフィールドがありません。")
-            events_data = project.get("events", [])
-            if not isinstance(events_data, list):
-                raise ValueError("eventsは配列である必要があります。")
-            events = [Event.from_dict(item) for item in events_data]
-            positions = project.get("graph_positions", {})
-            timeline = project.get("timeline", {})
-            ignored = project.get("ignored_candidates", [])
-            if not isinstance(positions, dict) or not isinstance(timeline, dict) or not isinstance(ignored, list):
-                raise ValueError("プロジェクト内の状態データが不正です。")
+            project = parse_project(project)
         except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
             QMessageBox.critical(self, "読込失敗", f"プロジェクトを読み込めませんでした。\n{exc}")
             return
@@ -330,19 +315,13 @@ class MainWindow(QMainWindow):
                 return
 
         self._reset_document_session()
-        self.graph_view.import_positions(positions)
-        self._ignored_signatures = {
-            (signature[0], signature[1], signature[2], signature[3])
-            for signature in ignored
-            if isinstance(signature, list) and len(signature) == 4
-            and isinstance(signature[0], int)
-            and all(isinstance(part, str) for part in signature[1:])
-        }
+        self.graph_view.import_positions(project["graph_positions"])
+        self._ignored_signatures = set(project["ignored_candidates"])
         self.editor.setPlainText(project["text"])
-        for event in events:
+        for event in project["events"]:
             self.world_engine.add_event(event)
         self.timeline_panel.set_events(self.world_engine.events_sorted())
-        self.timeline_panel.restore_project_state(timeline)
+        self.timeline_panel.restore_project_state(project["timeline"])
         self._debounce.start()
 
     def _export_json(self) -> None:

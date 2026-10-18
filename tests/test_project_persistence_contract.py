@@ -1,62 +1,60 @@
-"""Cross-platform .axral.json v1 persistence contract tests."""
+"""Cross-platform .axral.json v1 persistence codec tests."""
 
 import json
 import unittest
 
 from core.events import Effect, Event
 from core.models import stable_entity_id, stable_relation_id
+from core.project import build_project, parse_project
 
 
 class ProjectPersistenceContractTests(unittest.TestCase):
     def project_fixture(self):
         relation_id = stable_relation_id("主人公->東京#0")
-        return {
-            "format": "axral-world-project",
-            "schema_version": 1,
-            "text": "[主人公:Character]\n[東京:Location]\n主人公 -> 東京 : 移動",
-            "events": [
-                Event(
-                    id="evt_contract_001",
-                    timestamp=42,
-                    type="移動",
-                    participants=[stable_entity_id("主人公")],
-                    effects=[
-                        Effect(
-                            kind="relation_status",
-                            target_id=relation_id,
-                            payload={"status": "hypothetical"},
-                        )
-                    ],
-                    is_snapshot_point=True,
-                    metadata={"note": "日本語のEvent"},
-                ).to_dict()
+        event = Event(
+            id="evt_contract_001",
+            timestamp=42,
+            type="移動",
+            participants=[stable_entity_id("主人公")],
+            effects=[
+                Effect(
+                    kind="relation_status",
+                    target_id=relation_id,
+                    payload={"status": "hypothetical"},
+                )
             ],
-            "graph_positions": {
+            is_snapshot_point=True,
+            metadata={"note": "日本語のEvent"},
+        )
+        return build_project(
+            text="[主人公:Character]\n[東京:Location]\n主人公 -> 東京 : 移動",
+            events=[event],
+            graph_positions={
                 stable_entity_id("主人公"): {"x": 123.5, "y": -40},
                 stable_entity_id("東京"): {"x": 600, "y": 240},
             },
-            "timeline": {
+            timeline={
                 "mode": True,
                 "timestamp": 42,
                 "visible_layers": ["Su-ken", "Kan-ken"],
             },
-            "ignored_candidates": [[3, "主人公", "東京", "移動"]],
-        }
+            ignored_candidates=[[3, "主人公", "東京", "移動"]],
+        )
 
-    def test_json_round_trip_preserves_all_v1_fields(self):
+    def test_json_round_trip_uses_application_codec_and_preserves_v1_fields(self):
         project = self.project_fixture()
-        restored = json.loads(json.dumps(project, ensure_ascii=False))
-        self.assertEqual(restored["format"], "axral-world-project")
-        self.assertEqual(restored["schema_version"], 1)
+        restored_payload = json.loads(json.dumps(project, ensure_ascii=False))
+        restored = parse_project(restored_payload)
         self.assertEqual(restored["text"], project["text"])
-        self.assertEqual(restored["events"], project["events"])
+        self.assertEqual(len(restored["events"]), 1)
         self.assertEqual(
-            restored["events"][0]["effects"][0]["target_id"],
+            restored["events"][0].effects[0].target_id,
             stable_relation_id("主人公->東京#0"),
         )
+        self.assertEqual(restored["events"][0].to_dict(), project["events"][0])
         self.assertEqual(restored["graph_positions"], project["graph_positions"])
         self.assertEqual(restored["timeline"], project["timeline"])
-        self.assertEqual(restored["ignored_candidates"], project["ignored_candidates"])
+        self.assertEqual(restored["ignored_candidates"], [(3, "主人公", "東京", "移動")])
 
     def test_ignored_candidate_signature_contract(self):
         valid = [3, "主人公", "東京", "移動"]
@@ -64,6 +62,7 @@ class ProjectPersistenceContractTests(unittest.TestCase):
             [3, "主人公", "東京"],
             ["3", "主人公", "東京", "移動"],
             [3, "主人公", "東京", None],
+            [True, "主人公", "東京", "移動"],
         ]
 
         def is_portable_signature(value):
@@ -79,6 +78,24 @@ class ProjectPersistenceContractTests(unittest.TestCase):
         for signature in invalid:
             with self.subTest(signature=signature):
                 self.assertFalse(is_portable_signature(signature))
+
+    def test_project_codec_rejects_invalid_required_fields_and_positions(self):
+        project = self.project_fixture()
+        invalid_payloads = [
+            {**project, "schema_version": 2},
+            {**project, "text": None},
+            {**project, "events": [None]},
+            {
+                **project,
+                "graph_positions": {
+                    stable_entity_id("主人公"): {"x": float("nan"), "y": 0}
+                },
+            },
+        ]
+        for payload in invalid_payloads:
+            with self.subTest(payload=payload):
+                with self.assertRaises(ValueError):
+                    parse_project(payload)
 
 
 if __name__ == "__main__":
