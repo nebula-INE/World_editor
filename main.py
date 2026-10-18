@@ -331,7 +331,13 @@ class MainWindow(QMainWindow):
 
         self._reset_document_session()
         self.graph_view.import_positions(positions)
-        self._ignored_signatures = {tuple(signature) for signature in ignored if isinstance(signature, list)}
+        self._ignored_signatures = {
+            (signature[0], signature[1], signature[2], signature[3])
+            for signature in ignored
+            if isinstance(signature, list) and len(signature) == 4
+            and isinstance(signature[0], int)
+            and all(isinstance(part, str) for part in signature[1:])
+        }
         self.editor.setPlainText(project["text"])
         for event in events:
             self.world_engine.add_event(event)
