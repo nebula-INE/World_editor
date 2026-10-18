@@ -262,6 +262,25 @@ class GraphView(QGraphicsView):
             self.fitInView(self._scene.sceneRect(), Qt.KeepAspectRatio)
             self._has_fit = True
 
+    def export_positions(self) -> dict[str, dict[str, float]]:
+        """Return node positions in a JSON-safe representation."""
+        return {
+            entity_id: {"x": float(pos.x()), "y": float(pos.y())}
+            for entity_id, pos in self._positions.items()
+        }
+
+    def import_positions(self, positions: dict) -> None:
+        """Restore validated node positions from a project file."""
+        restored: dict[str, QPointF] = {}
+        for entity_id, value in positions.items():
+            if not isinstance(entity_id, str) or not isinstance(value, dict):
+                continue
+            x, y = value.get("x"), value.get("y")
+            if isinstance(x, (int, float)) and isinstance(y, (int, float)):
+                restored[entity_id] = QPointF(float(x), float(y))
+        self._positions = restored
+        self._has_fit = False
+
     def reset_layout(self) -> None:
         """Clear canvas state when the active document changes."""
         self._positions.clear()

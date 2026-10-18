@@ -1635,3 +1635,33 @@ This section records repository inspection findings before implementation. These
 - This slice prevents document-to-document state leakage; it does **not** yet save or restore Timeline Events or node positions across application restarts.
 - Full project persistence, dirty-state warnings, save/reopen tests and Python/TypeScript parity fixtures remain the next implementation slice.
 - CI results and runtime interaction still need to be checked before this change is considered release-ready.
+
+## 25. U1 Implementation Slice — Versioned Project Persistence (2026-10-18)
+
+### Project format v1
+
+Both browser and desktop implementations now define the same top-level project envelope:
+
+- `format`: `axral-world-project`
+- `schema_version`: `1`
+- `text`: Codex/WorldCode source text
+- `events`: serialized Timeline Event records
+- `graph_positions`: entity ID to numeric `x`/`y` coordinates
+- `timeline`: mode, timestamp, and visible layer names
+- `ignored_candidates`: candidate ignore state (string IDs in Web; signature arrays in Desktop)
+
+The final field is deliberately tolerant of implementation-specific candidate identity; it is not yet a shared cross-platform identity scheme.
+
+### Implemented in this slice
+
+- Added explicit **Save Axral Project** and **Open Axral Project** actions, separate from text-only save and Canonical Data export.
+- Persisted/restored Codex text, Timeline Events, graph node positions, Timeline mode/timestamp/layer filters, and ignored-candidate state.
+- Added format/version checks and user-visible errors for invalid project files.
+- Added graph position import/export on Desktop and position-state handoff between the Web canvas and the project controller.
+
+### Remaining validation and limitations
+
+- CI/build checks and manual open-save-reopen interaction tests must pass before this is release-ready.
+- Camera zoom/pan transform, selected Event, unsaved-change detection, and automatic recovery are not part of v1.
+- Web and Desktop represent ignored candidates differently; the field is preserved per platform but not guaranteed to transfer semantically between them.
+- This is local file persistence only; it does not add cloud sync or collaborative editing.

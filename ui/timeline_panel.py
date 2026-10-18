@@ -191,6 +191,38 @@ class TimelinePanel(QWidget):
             item.setData(Qt.UserRole, e.id)
             self.event_list.addItem(item)
 
+    def export_project_state(self) -> dict:
+        return {
+            "mode": self.is_timeline_mode(),
+            "timestamp": self.current_timestamp(),
+            "visible_layers": sorted(self.visible_layers()),
+        }
+
+    def restore_project_state(self, state: dict) -> None:
+        self.mode_check.blockSignals(True)
+        self.mode_check.setChecked(bool(state.get("mode", False)))
+        self.mode_check.blockSignals(False)
+
+        timestamp = state.get("timestamp", 0)
+        if isinstance(timestamp, (int, float)):
+            timestamp = int(timestamp)
+            self.slider.blockSignals(True)
+            self.slider.setRange(min(self.slider.minimum(), timestamp), max(self.slider.maximum(), timestamp))
+            self.slider.setValue(timestamp)
+            self.slider.blockSignals(False)
+            self.timestamp_label.setText(f"t = {self.slider.value()}")
+
+        visible = state.get("visible_layers", LAYER_HIERARCHY)
+        if isinstance(visible, list):
+            visible_set = set(visible)
+            for name, checkbox in self._layer_checks.items():
+                checkbox.blockSignals(True)
+                checkbox.setChecked(name in visible_set)
+                checkbox.blockSignals(False)
+        self.layer_filter_changed.emit(self.visible_layers())
+        self.timeline_mode_toggled.emit(self.is_timeline_mode())
+        self.timestamp_changed.emit(self.current_timestamp())
+
     def reset_document_session(self) -> None:
         """Reset Timeline controls and event selection for a newly opened document."""
         self.mode_check.blockSignals(True)

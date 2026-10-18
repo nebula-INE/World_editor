@@ -85,6 +85,7 @@ Worldbuilding Linter (§15) を接続する。
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 
@@ -102,7 +103,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core.events import Effect, new_event
+from core.events import Effect, Event, new_event
 from core.indexer import index_natural_lines
 from core.linter import lint
 from core.models import WorldModel
@@ -214,6 +215,11 @@ class MainWindow(QMainWindow):
         save_action = file_menu.addAction("Save Codex Text...")
         save_action.triggered.connect(self._save_text)
 
+        project_open_action = file_menu.addAction("Open Axral Project...")
+        project_open_action.triggered.connect(self._open_project)
+        project_save_action = file_menu.addAction("Save Axral Project...")
+        project_save_action.triggered.connect(self._save_project)
+
         file_menu.addSeparator()
 
         export_action = file_menu.addAction("Export Canonical Data (JSON)...")
@@ -260,6 +266,78 @@ class MainWindow(QMainWindow):
             return
         with open(path, "w", encoding="utf-8") as f:
             f.write(self.editor.toPlainText())
+
+    def _save_project(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Axral Project", "world.axral.json", "Axral Project (*.axral.json)"
+        )
+        if not path:
+            return
+        project = {
+            "format": "axral-world-project",
+            "schema_version": 1,
+            "text": self.editor.toPlainText(),
+            "events": [event.to_dict() for event in self.world_engine.events_sorted()],
+            "graph_positions": self.graph_view.export_positions(),
+            "timeline": self.timeline_panel.export_project_state(),
+            "ignored_candidates": [list(signature) for signature in sorted(self._ignored_signatures, key=repr)],
+        }
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(project, f, ensure_ascii=False, indent=2)
+        except (OSError, TypeError, ValueError) as exc:
+            QMessageBox.critical(self, "保存失敗", f"プロジェクトを保存できませんでした。\n{exc}")
+            return
+        QMessageBox.information(self, "保存完了", f"プロジェクトを保存しました:\n{path}")
+
+    def _open_project(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Open Axral Project", "", "Axral Project (*.axral.json *.json)"
+        )
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                project = json.load(f)
+            if not isinstance(project, dict) or project.get("format") != "axral-world-project":
+                raise ValueError("Axral World Project形式ではありません。")
+            if project.get("schema_version") != 1:
+                raise ValueError(f"未対応のプロジェクトschema_versionです: {project.get('schema_version')!r}")
+            if not isinstance(project.get("text"), str):
+                raise ValueError("textフィールドがありません。")
+            events_data = project.get("events", [])
+            if not isinstance(events_data, list):
+                raise ValueError("eventsは配列である必要があります。")
+            events = [Event.from_dict(item) for item in events_data]
+            positions = project.get("graph_positions", {})
+            timeline = project.get("timeline", {})
+            ignored = project.get("ignored_candidates", [])
+            if not isinstance(positions, dict) or not isinstance(timeline, dict) or not isinstance(ignored, list):
+                raise ValueError("プロジェクト内の状態データが不正です。")
+        except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+            QMessageBox.critical(self, "読込失敗", f"プロジェクトを読み込めませんでした。\n{exc}")
+            return
+
+        if self.world_engine.events_sorted():
+            answer = QMessageBox.question(
+                self,
+                "現在のTimeline Event",
+                "現在の文書のTimeline Eventは未保存のままです。読み込んだプロジェクトに置き換えますか？",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if answer != QMessageBox.Yes:
+                return
+
+        self._reset_document_session()
+        self.graph_view.import_positions(positions)
+        self._ignored_signatures = {tuple(signature) for signature in ignored if isinstance(signature, list)}
+        self.editor.setPlainText(project["text"])
+        for event in events:
+            self.world_engine.add_event(event)
+        self.timeline_panel.set_events(self.world_engine.events_sorted())
+        self.timeline_panel.restore_project_state(timeline)
+        self._debounce.start()
 
     def _export_json(self) -> None:
         result = parse_codex_syntax(self.editor.toPlainText())
