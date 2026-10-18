@@ -36,6 +36,64 @@ def build_project(
     }
 
 
+
+def _parse_event(item: dict[str, Any], index: int) -> Event:
+    """Validate and normalize an Event using the same contract as the Web codec."""
+    prefix = f"events[{index}]"
+    event_id = item.get("id")
+    timestamp = item.get("timestamp")
+    event_type = item.get("type")
+    if not isinstance(event_id, str):
+        raise ValueError(f"{prefix}.idは文字列である必要があります。")
+    if (isinstance(timestamp, bool) or not isinstance(timestamp, (int, float))
+            or not math.isfinite(timestamp)):
+        raise ValueError(f"{prefix}.timestampは有限数である必要があります。")
+    if not isinstance(event_type, str):
+        raise ValueError(f"{prefix}.typeは文字列である必要があります。")
+
+    participants = item.get("participants", [])
+    if not isinstance(participants, list) or not all(
+        isinstance(participant, str) for participant in participants
+    ):
+        raise ValueError(f"{prefix}.participantsは文字列配列である必要があります。")
+
+    effects_data = item.get("effects", [])
+    if not isinstance(effects_data, list):
+        raise ValueError(f"{prefix}.effectsは配列である必要があります。")
+    effects = []
+    for effect_index, effect in enumerate(effects_data):
+        effect_prefix = f"{prefix}.effects[{effect_index}]"
+        if not isinstance(effect, dict) or not isinstance(effect.get("kind"), str):
+            raise ValueError(f"{effect_prefix}.kindは文字列である必要があります。")
+        target_id = effect.get("target_id")
+        if target_id is not None and not isinstance(target_id, str):
+            raise ValueError(f"{effect_prefix}.target_idは文字列またはnullである必要があります。")
+        effect_payload = effect.get("payload", {})
+        if not isinstance(effect_payload, dict):
+            raise ValueError(f"{effect_prefix}.payloadはオブジェクトである必要があります。")
+        effects.append(Effect(kind=effect["kind"], target_id=target_id, payload=effect_payload))
+
+    snapshot = item.get("is_snapshot_point", False)
+    if not isinstance(snapshot, bool):
+        raise ValueError(f"{prefix}.is_snapshot_pointは真偽値である必要があります。")
+    schema_version = item.get("schema_version", SCHEMA_VERSION)
+    if (isinstance(schema_version, bool) or not isinstance(schema_version, int)):
+        raise ValueError(f"{prefix}.schema_versionは整数である必要があります。")
+    metadata = item.get("metadata", {})
+    if not isinstance(metadata, dict):
+        raise ValueError(f"{prefix}.metadataはオブジェクトである必要があります。")
+
+    return Event(
+        id=event_id,
+        timestamp=timestamp,
+        type=event_type,
+        participants=list(participants),
+        effects=effects,
+        is_snapshot_point=snapshot,
+        schema_version=schema_version,
+        metadata=metadata,
+    )
+
 def parse_project(payload: Any) -> dict[str, Any]:
     """Validate a decoded payload and return normalized values for application loading."""
     if not isinstance(payload, dict) or payload.get("format") != PROJECT_FORMAT:
@@ -55,7 +113,7 @@ def parse_project(payload: Any) -> dict[str, Any]:
     for index, item in enumerate(events_data):
         if not isinstance(item, dict):
             raise ValueError(f"events[{index}]はオブジェクトである必要があります。")
-        events.append(Event.from_dict(item))
+        events.append(_parse_event(item, index))
 
     positions = payload.get("graph_positions", {})
     timeline_data = payload.get("timeline", {})
