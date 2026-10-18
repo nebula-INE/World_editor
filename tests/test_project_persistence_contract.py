@@ -2,6 +2,7 @@
 
 import json
 import unittest
+from pathlib import Path
 
 from core.events import Effect, Event
 from core.models import stable_entity_id, stable_relation_id
@@ -40,6 +41,20 @@ class ProjectPersistenceContractTests(unittest.TestCase):
             },
             ignored_candidates=[[3, "主人公", "東京", "移動"]],
         )
+
+    def test_shared_golden_fixture_is_readable_by_desktop_codec(self):
+        fixture_path = Path(__file__).parent / "fixtures" / "axral-project-v1.json"
+        payload = json.loads(fixture_path.read_text(encoding="utf-8"))
+        restored = parse_project(payload)
+        self.assertEqual(restored["text"], payload["text"])
+        self.assertEqual([event.to_dict() for event in restored["events"]], payload["events"])
+        self.assertEqual(
+            restored["events"][0].effects[0].target_id,
+            stable_relation_id("主人公->東京#0"),
+        )
+        self.assertEqual(restored["graph_positions"], payload["graph_positions"])
+        self.assertEqual(restored["timeline"], payload["timeline"])
+        self.assertEqual(restored["ignored_candidates"], [(3, "主人公", "東京", "移動")])
 
     def test_json_round_trip_uses_application_codec_and_preserves_v1_fields(self):
         project = self.project_fixture()
