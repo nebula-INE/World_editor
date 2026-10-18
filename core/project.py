@@ -127,6 +127,8 @@ def parse_project(payload: Any) -> dict[str, Any]:
     timestamp = timeline_data.get("timestamp", 0)
     if isinstance(timestamp, bool) or not isinstance(timestamp, (int, float)) or not math.isfinite(timestamp):
         timestamp = 0
+    else:
+        timestamp = int(timestamp)
     visible_layers = timeline_data.get("visible_layers")
     if isinstance(visible_layers, list):
         visible_layers = [layer for layer in visible_layers if isinstance(layer, str)]
