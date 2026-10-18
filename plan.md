@@ -1674,3 +1674,8 @@ The final field is deliberately tolerant of implementation-specific candidate id
 - Shared expected examples: `A → ent_6dcd4ce23d88`, `Alice → ent_35318264c9a9`, `東京 → ent_681ee300008e`, `主人公 → ent_8f07c23f5f99`.
 - This resolves entity ID mismatch for graph positions and entity references when the same names are parsed by both implementations.
 - **Remaining limitation:** Relation IDs and Event IDs are still generated randomly; ignored-candidate identity also differs between Web and Desktop. This slice does not claim full semantic portability for those records. Cross-platform project save/reopen behavior and runtime UI interactions still require automated and manual verification.
+
+
+# 27. U1 Cross-Platform Stable Relation IDs (2026-10-18)
+
+Relation IDs are derived as `rel_` + SHA-1(UTF-8(`ref_key`))[:12]. `ref_key` remains `SourceName->TargetName#n`, where `n` is the zero-based occurrence for an ordered entity pair. This keeps Event effects targeting a Relation portable when a `.axral.json` project is opened on the other platform and the text is reparsed. Event IDs themselves remain persisted opaque IDs; they are not regenerated when a project is opened. Cross-platform ignored-candidate serialization and live UI round-trip testing remain follow-up work.
