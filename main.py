@@ -227,6 +227,17 @@ class MainWindow(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(self, "Open Codex Text", "", "Text (*.txt *.md)")
         if not path:
             return
+        if self.world_engine.events_sorted():
+            answer = QMessageBox.question(
+                self,
+                "未保存のTimeline Event",
+                "現在のTimeline Eventはテキストファイルには保存されていません。"
+                "別の文書を開くと破棄されます。続行しますか？",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if answer != QMessageBox.Yes:
+                return
         with open(path, "r", encoding="utf-8") as f:
             text = f.read()
         self._reset_document_session()
