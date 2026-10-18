@@ -318,6 +318,17 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "読込失敗", f"プロジェクトを読み込めませんでした。\n{exc}")
             return
 
+        if self.world_engine.events_sorted():
+            answer = QMessageBox.question(
+                self,
+                "現在のTimeline Event",
+                "現在の文書のTimeline Eventは未保存のままです。読み込んだプロジェクトに置き換えますか？",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if answer != QMessageBox.Yes:
+                return
+
         self._reset_document_session()
         self.graph_view.import_positions(positions)
         self._ignored_signatures = {tuple(signature) for signature in ignored if isinstance(signature, list)}
