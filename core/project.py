@@ -8,8 +8,8 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from .events import Event
-from .models import LAYER_HIERARCHY
+from .events import Effect, Event
+from .models import LAYER_HIERARCHY, SCHEMA_VERSION
 
 PROJECT_FORMAT = "axral-world-project"
 PROJECT_SCHEMA_VERSION = 1
