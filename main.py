@@ -280,7 +280,7 @@ class MainWindow(QMainWindow):
             "events": [event.to_dict() for event in self.world_engine.events_sorted()],
             "graph_positions": self.graph_view.export_positions(),
             "timeline": self.timeline_panel.export_project_state(),
-            "ignored_signatures": [list(signature) for signature in sorted(self._ignored_signatures, key=repr)],
+            "ignored_candidates": [list(signature) for signature in sorted(self._ignored_signatures, key=repr)],
         }
         try:
             with open(path, "w", encoding="utf-8") as f:
@@ -311,7 +311,7 @@ class MainWindow(QMainWindow):
             events = [Event.from_dict(item) for item in events_data]
             positions = project.get("graph_positions", {})
             timeline = project.get("timeline", {})
-            ignored = project.get("ignored_signatures", [])
+            ignored = project.get("ignored_candidates", [])
             if not isinstance(positions, dict) or not isinstance(timeline, dict) or not isinstance(ignored, list):
                 raise ValueError("プロジェクト内の状態データが不正です。")
         except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
