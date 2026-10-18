@@ -56,6 +56,19 @@ class ProjectPersistenceContractTests(unittest.TestCase):
         self.assertEqual(restored["timeline"], payload["timeline"])
         self.assertEqual(restored["ignored_candidates"], [(3, "主人公", "東京", "移動")])
 
+    def test_shared_golden_fixture_survives_desktop_codec_round_trip(self):
+        fixture_path = Path(__file__).parent / "fixtures" / "axral-project-v1.json"
+        original = json.loads(fixture_path.read_text(encoding="utf-8"))
+        restored = parse_project(original)
+        rebuilt = build_project(
+            text=restored["text"],
+            events=restored["events"],
+            graph_positions=restored["graph_positions"],
+            timeline=restored["timeline"],
+            ignored_candidates=restored["ignored_candidates"],
+        )
+        self.assertEqual(rebuilt, original)
+
     def test_json_round_trip_uses_application_codec_and_preserves_v1_fields(self):
         project = self.project_fixture()
         restored_payload = json.loads(json.dumps(project, ensure_ascii=False))
