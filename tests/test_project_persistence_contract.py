@@ -147,5 +147,56 @@ class ProjectPersistenceContractTests(unittest.TestCase):
                     parse_project(payload)
 
 
+
+    def test_event_and_effect_validation_matches_web_codec(self):
+        base = self.project_fixture()
+        original_event = base["events"][0]
+
+        invalid_events = []
+        for field, value in [
+            ("id", None),
+            ("timestamp", True),
+            ("timestamp", float("nan")),
+            ("type", 7),
+            ("participants", ["主人公", 3]),
+            ("participants", {}),
+            ("effects", {}),
+            ("is_snapshot_point", "true"),
+            ("schema_version", True),
+            ("schema_version", 1.5),
+            ("metadata", []),
+        ]:
+            invalid_events.append({**original_event, field: value})
+
+        invalid_effects = [
+            {"kind": 4},
+            {"kind": "relation_status", "target_id": 42},
+            {"kind": "relation_status", "payload": []},
+            None,
+        ]
+        for effect in invalid_effects:
+            invalid_events.append({**original_event, "effects": [effect]})
+
+        for event in invalid_events:
+            payload = {**base, "events": [event]}
+            with self.subTest(event=event):
+                with self.assertRaises(ValueError):
+                    parse_project(payload)
+
+    def test_legacy_event_optional_fields_are_normalized(self):
+        project = self.project_fixture()
+        event = {
+            "id": "evt_legacy",
+            "timestamp": 3,
+            "type": "移動",
+        }
+        project["events"] = [event]
+        restored = parse_project(project)["events"][0]
+        self.assertEqual(restored.participants, [])
+        self.assertEqual(restored.effects, [])
+        self.assertFalse(restored.is_snapshot_point)
+        self.assertEqual(restored.schema_version, Event("x", 0, "x").schema_version)
+        self.assertEqual(restored.metadata, {})
+
 if __name__ == "__main__":
     unittest.main()
