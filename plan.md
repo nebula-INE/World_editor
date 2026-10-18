@@ -1621,3 +1621,17 @@ This section records repository inspection findings before implementation. These
 - A failed save/export is visible and does not silently mark the project as saved.
 - Browser and desktop implementations produce equivalent Canonical Data for the same fixture.
 - The Web repository's supported launch path is unambiguous.
+
+## 24. U0-B Implementation Slice — Document Session Isolation (2026-10-18)
+
+### Implemented on `fix/document-session-isolation`
+
+- **Web (`src/App.tsx`):** opening a text file clears Timeline Events, selected Event, ignored candidates, Timeline mode/timestamp, layer filters and highlighted-line state. The GraphView is remounted for the new document so node positions and camera state do not carry over.
+- **Desktop (`main.py`, `ui/timeline_panel.py`, `ui/graph_view.py`):** opening a text file replaces the WorldStateEngine, clears ignored candidates and cached parse state, resets Timeline controls/events, and clears the graph layout before reparsing.
+- **Build validation:** added a dedicated browser CI workflow running `npm install` and `npm run build` because the existing workflow builds the retained PySide6 desktop app and does not validate the React/Vite frontend.
+
+### Not yet completed
+
+- This slice prevents document-to-document state leakage; it does **not** yet save or restore Timeline Events or node positions across application restarts.
+- Full project persistence, dirty-state warnings, save/reopen tests and Python/TypeScript parity fixtures remain the next implementation slice.
+- CI results and runtime interaction still need to be checked before this change is considered release-ready.

@@ -262,6 +262,13 @@ class GraphView(QGraphicsView):
             self.fitInView(self._scene.sceneRect(), Qt.KeepAspectRatio)
             self._has_fit = True
 
+    def reset_layout(self) -> None:
+        """Clear canvas state when the active document changes."""
+        self._positions.clear()
+        self._node_items.clear()
+        self._scene.clear()
+        self._has_fit = False
+
     def _remember_position(self, entity_id: str, pos: QPointF) -> None:
         self._positions[entity_id] = QPointF(pos)
 
