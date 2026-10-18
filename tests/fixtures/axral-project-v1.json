@@ -1,0 +1,55 @@
+{
+  "format": "axral-world-project",
+  "schema_version": 1,
+  "text": "[主人公:Character]\n[東京:Location]\n主人公 -> 東京 : 移動",
+  "events": [
+    {
+      "id": "evt_contract_001",
+      "timestamp": 42,
+      "type": "移動",
+      "participants": [
+        "ent_8f07c23f5f99"
+      ],
+      "effects": [
+        {
+          "kind": "relation_status",
+          "target_id": "rel_a1fb9eeeb948",
+          "payload": {
+            "status": "hypothetical"
+          }
+        }
+      ],
+      "is_snapshot_point": true,
+      "schema_version": 1,
+      "metadata": {
+        "note": "日本語のEvent"
+      }
+    }
+  ],
+  "graph_positions": {
+    "ent_8f07c23f5f99": {
+      "x": 123.5,
+      "y": -40
+    },
+    "ent_681ee300008e": {
+      "x": 600,
+      "y": 240
+    }
+  },
+  "timeline": {
+    "mode": true,
+    "timestamp": 42,
+    "visible_layers": [
+      "Su-ken",
+      "Kan-ken"
+    ]
+  },
+  "ignored_candidates": [
+    [
+      3,
+      "主人公",
+      "東京",
+      "移動"
+    ]
+  ]
+}
