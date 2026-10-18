@@ -1575,3 +1575,49 @@ Codex Syntaxを前提知識にしない。構文例、入力補完、エラー�
 - UI改善のために決定論的Parserや既存のデータ形式を不用意に変更しない。
 - AIによる自動確定を追加する場合も、ユーザー確認と元テキスト保護を維持する。
 - 完了判定は「コードを書いた」ではなく、テストとユーザー操作の結果で行う。
+
+
+---
+
+# 23. U0 Cross-Platform Audit Findings (2026-10-18)
+
+This section records repository inspection findings before implementation. These are source-level findings; no local build, automated test suite, or hands-on device test was run as part of this audit.
+
+## 23.1 Repository roles and architecture
+
+- `World_editor_web` contains a real browser application: React 19 + TypeScript + Vite, with `src/App.tsx` and `src/components/*`. It also retains a parallel PySide6 implementation in root-level `main.py` and `ui/*`.
+- `World_editor` is the PySide6 desktop application (`main.py`, `ui/*`, `core/*`).
+- The Python UI/core files inspected in both repositories share matching blob SHAs for several major modules (`ui/graph_view.py`, `ui/timeline_panel.py`, `core/models.py`, `core/events.py`); the Python `main.py` files differ slightly.
+- The browser implementation has a separate TypeScript port under `src/core/*`. Therefore, “shared architecture” currently means parallel implementations, not one shared runtime core. Cross-platform parity must be protected by shared fixtures/specifications and parity tests.
+- The README describes MVP1 capabilities but does not distinguish clearly enough between the browser React app and the legacy/parallel PySide6 app in the web repository. Clarify launch/build instructions and which implementation is the supported Web target.
+
+## 23.2 Confirmed usability and data-safety findings
+
+| Area | Browser React app | PySide6 desktop app | Priority |
+|---|---|---|---|
+| Main editor/graph/candidate layout | Fixed three-column layout with minimum widths (editor 280px, graph 320px, candidate 260px); narrow screens can overflow/compress rather than reflow | Three-pane QSplitter with initial sizes 440/620/320; responsive behavior is not established by source inspection | P0/P1: verify on actual target widths |
+| Text persistence | Editor text is saved to localStorage automatically; manual save downloads Markdown | Open/Save dialog handles text files | P0: make persistence and save state explicit |
+| Timeline event persistence | Events live in React state; they are replayed when text changes, but no localStorage serialization for events was found in the inspected App flow | Events live in WorldStateEngine memory; Save Codex Text writes only editor text | P0: events can be lost on refresh/close or when switching projects |
+| Switching/opening documents | Opening a file replaces editor text but does not visibly reset/rebind the current event list; potential cross-document event contamination | Opening a file replaces editor text while the same WorldStateEngine remains alive; event/project reset behavior needs correction/confirmation | P0: isolate state per document |
+| Undo/Redo | No app-level undo/redo controls or history layer found in the inspected App flow; browser textarea/editor native behavior alone is not a durable cross-panel history | No app-level Undo/Redo found in the inspected menu/core UI | P0 |
+| Graph node positions | Position state is held in React component state and is not visibly serialized with text/JSON export | Positions are held in GraphView memory and are not visibly serialized with the text save | P1 |
+| Layout/graph interactions | GraphView includes zoom/pan and touch gesture handling; mobile usability still needs hands-on validation | QGraphicsView supports node dragging, but only initial auto-layout is evident in source comments | P1 |
+| Build/test discoverability | Vite/TypeScript build configuration and a GitHub Actions workflow exist; a root `tests/` directory was not found | No root `.github/` or `tests/` directory appeared in the inspected root listing; test setup must be verified separately | P0 for release confidence |
+
+## 23.3 Revised implementation order
+
+1. **U0-A — Define supported targets:** document that `World_editor_web/src` is the browser implementation and `World_editor/main.py` is the desktop implementation; clarify the extra PySide6 code retained in the Web repository.
+2. **U0-B — Project-state boundary:** add a document/session model so events, ignored candidates, node positions, timeline selection and filters are bound to the active document and reset/loaded consistently on Open/New.
+3. **U1 — Safe persistence:** persist Timeline Events and (where supported) graph positions in a versioned project format; make text-only export distinct from full-project save; add visible save/recovery status.
+4. **U1 — Undo/Redo:** define history transactions spanning editor edits and accepted canvas/patch changes; do not treat ordinary typing as separate unbounded transactions.
+5. **U0-C — Parity fixtures and tests:** create common Codex input fixtures and expected entity/relation/lint/event outputs; run equivalent tests against Python and TypeScript implementations.
+6. **U5/U6 — Responsive/platform UX:** after project safety is addressed, validate mobile/tablet browser layout and desktop keyboard/file workflows.
+7. **U8 — Release gate:** require successful browser production build, desktop launch/test evidence, parity tests, save/reopen tests, event isolation tests and Undo/Redo tests.
+
+## 23.4 Acceptance criteria for the first implementation slice
+
+- Opening or creating a document cannot accidentally retain another document's events.
+- Saving and reopening a project restores its text and Timeline Events; any intentionally unpersisted UI state is clearly documented.
+- A failed save/export is visible and does not silently mark the project as saved.
+- Browser and desktop implementations produce equivalent Canonical Data for the same fixture.
+- The Web repository's supported launch path is unambiguous.
