@@ -57,6 +57,11 @@ def stable_entity_id(name: str) -> str:
     return "ent_" + hashlib.sha1(name.encode("utf-8")).hexdigest()[:12]
 
 
+def stable_relation_id(ref_key: str) -> str:
+    """Relation ID derived from the cross-platform stable ref_key."""
+    return "rel_" + hashlib.sha1(ref_key.encode("utf-8")).hexdigest()[:12]
+
+
 @dataclass
 class SourceRef:
     """このEntity/Relationがどの行・どの記述から生成されたかを追跡する。"""
@@ -229,7 +234,7 @@ class WorldModel:
         ref_key = f"{source_name}->{target_name}#{n}"
 
         relation = Relation(
-            id=new_id("rel"),
+            id=stable_relation_id(ref_key),
             source=source_id,
             target=target_id,
             type=rel_type,
