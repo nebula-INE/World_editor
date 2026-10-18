@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from core.events import Effect, Event
-from core.models import stable_entity_id, stable_relation_id
+from core.models import LAYER_HIERARCHY, stable_entity_id, stable_relation_id
 from core.project import build_project, parse_project
 
 
@@ -93,6 +93,27 @@ class ProjectPersistenceContractTests(unittest.TestCase):
         for signature in invalid:
             with self.subTest(signature=signature):
                 self.assertFalse(is_portable_signature(signature))
+
+
+    def test_timeline_fields_normalize_like_web_codec(self):
+        project = self.project_fixture()
+        project["timeline"] = {
+            "mode": "true",
+            "timestamp": float("nan"),
+            "visible_layers": ["Su-ken", 42, None],
+        }
+        restored = parse_project(project)
+        self.assertEqual(
+            restored["timeline"],
+            {"mode": False, "timestamp": 0, "visible_layers": ["Su-ken"]},
+        )
+
+        project.pop("timeline")
+        restored_without_timeline = parse_project(project)
+        self.assertEqual(
+            restored_without_timeline["timeline"],
+            {"mode": False, "timestamp": 0, "visible_layers": LAYER_HIERARCHY},
+        )
 
     def test_project_codec_rejects_invalid_required_fields_and_positions(self):
         project = self.project_fixture()
