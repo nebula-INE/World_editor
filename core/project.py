@@ -9,6 +9,7 @@ import math
 from typing import Any
 
 from .events import Event
+from .models import LAYER_HIERARCHY
 
 PROJECT_FORMAT = "axral-world-project"
 PROJECT_SCHEMA_VERSION = 1
@@ -57,10 +58,27 @@ def parse_project(payload: Any) -> dict[str, Any]:
         events.append(Event.from_dict(item))
 
     positions = payload.get("graph_positions", {})
-    timeline = payload.get("timeline", {})
+    timeline_data = payload.get("timeline", {})
     ignored = payload.get("ignored_candidates", [])
-    if not isinstance(positions, dict) or not isinstance(timeline, dict) or not isinstance(ignored, list):
+    if not isinstance(positions, dict) or not isinstance(timeline_data, dict) or not isinstance(ignored, list):
         raise ValueError("プロジェクト内の状態データが不正です。")
+    # Match the Web codec's tolerant normalization for optional timeline fields.
+    mode = timeline_data.get("mode", False)
+    if not isinstance(mode, bool):
+        mode = False
+    timestamp = timeline_data.get("timestamp", 0)
+    if isinstance(timestamp, bool) or not isinstance(timestamp, (int, float)) or not math.isfinite(timestamp):
+        timestamp = 0
+    visible_layers = timeline_data.get("visible_layers")
+    if isinstance(visible_layers, list):
+        visible_layers = [layer for layer in visible_layers if isinstance(layer, str)]
+    else:
+        visible_layers = list(LAYER_HIERARCHY)
+    timeline = {
+        "mode": mode,
+        "timestamp": timestamp,
+        "visible_layers": visible_layers,
+    }
     for entity_id, point in positions.items():
         if not isinstance(entity_id, str) or not isinstance(point, dict):
             raise ValueError("graph_positionsの形式が不正です。")
