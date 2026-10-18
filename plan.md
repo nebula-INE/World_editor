@@ -1679,3 +1679,9 @@ The final field is deliberately tolerant of implementation-specific candidate id
 # 27. U1 Cross-Platform Stable Relation IDs (2026-10-18)
 
 Relation IDs are derived as `rel_` + SHA-1(UTF-8(`ref_key`))[:12]. `ref_key` remains `SourceName->TargetName#n`, where `n` is the zero-based occurrence for an ordered entity pair. This keeps Event effects targeting a Relation portable when a `.axral.json` project is opened on the other platform and the text is reparsed. Event IDs themselves remain persisted opaque IDs; they are not regenerated when a project is opened. Cross-platform ignored-candidate serialization and live UI round-trip testing remain follow-up work.
+
+# 28. U1 Portable Ignored-Candidate Persistence (2026-10-18)
+
+- `.axral.json` now serializes `ignored_candidates` as arrays `[line, source_name, target_name, rel_type]`, matching the Desktop signature contract.
+- Web keeps the same signature internally instead of persisting ephemeral `cand_*` IDs; Desktop validates the four-field tuple when loading.
+- This resolves cross-platform candidate-ignore identity for newly saved projects. Full interactive Web-save → Desktop-open and Desktop-save → Web-open GUI round-trip checks remain a release validation item; CI build checks alone do not prove runtime UI behavior.
