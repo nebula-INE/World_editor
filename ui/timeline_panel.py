@@ -205,8 +205,10 @@ class TimelinePanel(QWidget):
 
         timestamp = state.get("timestamp", 0)
         if isinstance(timestamp, (int, float)):
+            timestamp = int(timestamp)
             self.slider.blockSignals(True)
-            self.slider.setValue(max(self.slider.minimum(), min(self.slider.maximum(), int(timestamp))))
+            self.slider.setRange(min(self.slider.minimum(), timestamp), max(self.slider.maximum(), timestamp))
+            self.slider.setValue(timestamp)
             self.slider.blockSignals(False)
             self.timestamp_label.setText(f"t = {self.slider.value()}")
 
