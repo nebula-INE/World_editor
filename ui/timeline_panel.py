@@ -191,6 +191,26 @@ class TimelinePanel(QWidget):
             item.setData(Qt.UserRole, e.id)
             self.event_list.addItem(item)
 
+    def reset_document_session(self) -> None:
+        """Reset Timeline controls and event selection for a newly opened document."""
+        self.mode_check.blockSignals(True)
+        self.mode_check.setChecked(False)
+        self.mode_check.blockSignals(False)
+
+        self.slider.blockSignals(True)
+        self.slider.setRange(-50, 50)
+        self.slider.setValue(0)
+        self.slider.blockSignals(False)
+        self.timestamp_label.setText("t = 0")
+
+        for checkbox in self._layer_checks.values():
+            checkbox.blockSignals(True)
+            checkbox.setChecked(True)
+            checkbox.blockSignals(False)
+
+        self.set_events([])
+        self.set_change_summary("")
+
     def set_timestamp_range(self, minimum: int, maximum: int) -> None:
         self.slider.blockSignals(True)
         self.slider.setRange(minimum, maximum)
