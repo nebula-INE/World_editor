@@ -1665,3 +1665,12 @@ The final field is deliberately tolerant of implementation-specific candidate id
 - Camera zoom/pan transform, selected Event, unsaved-change detection, and automatic recovery are not part of v1.
 - Web and Desktop represent ignored candidates differently; the field is preserved per platform but not guaranteed to transfer semantically between them.
 - This is local file persistence only; it does not add cloud sync or collaborative editing.
+
+
+## 26. U1 Cross-Platform Stable Entity IDs (2026-10-18)
+
+- Python's canonical ID rule is `ent_` + the first 12 lowercase hexadecimal characters of SHA-1 over the entity name's UTF-8 bytes.
+- The browser TypeScript implementation now mirrors the same byte-level rule with a synchronous SHA-1 implementation. This keeps `stableEntityId(name)` synchronous while matching Python for Latin, Japanese, and other Unicode names.
+- Shared expected examples: `A → ent_6dcd4ce23d88`, `Alice → ent_35318264c9a9`, `東京 → ent_681ee300008e`, `主人公 → ent_8f07c23f5f99`.
+- This resolves entity ID mismatch for graph positions and entity references when the same names are parsed by both implementations.
+- **Remaining limitation:** Relation IDs and Event IDs are still generated randomly; ignored-candidate identity also differs between Web and Desktop. This slice does not claim full semantic portability for those records. Cross-platform project save/reopen behavior and runtime UI interactions still require automated and manual verification.
