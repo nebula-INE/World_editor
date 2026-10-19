@@ -77,8 +77,12 @@ def _parse_event(item: dict[str, Any], index: int) -> Event:
     if not isinstance(snapshot, bool):
         raise ValueError(f"{prefix}.is_snapshot_pointは真偽値である必要があります。")
     schema_version = item.get("schema_version", SCHEMA_VERSION)
-    if (isinstance(schema_version, bool) or not isinstance(schema_version, int)):
+    if (isinstance(schema_version, bool)
+            or not isinstance(schema_version, (int, float))
+            or not math.isfinite(schema_version)
+            or (isinstance(schema_version, float) and not schema_version.is_integer())):
         raise ValueError(f"{prefix}.schema_versionは整数である必要があります。")
+    schema_version = int(schema_version)
     metadata = item.get("metadata", {})
     if not isinstance(metadata, dict):
         raise ValueError(f"{prefix}.metadataはオブジェクトである必要があります。")
@@ -100,7 +104,8 @@ def parse_project(payload: Any) -> dict[str, Any]:
         raise ValueError("Axral World Project形式ではありません。")
     schema_version = payload.get("schema_version")
     if (isinstance(schema_version, bool)
-            or not isinstance(schema_version, int)
+            or not isinstance(schema_version, (int, float))
+            or not math.isfinite(schema_version)
             or schema_version != PROJECT_SCHEMA_VERSION):
         raise ValueError(
             f"未対応のプロジェクトschema_versionです: {schema_version!r}"
