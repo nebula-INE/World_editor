@@ -98,9 +98,12 @@ def parse_project(payload: Any) -> dict[str, Any]:
     """Validate a decoded payload and return normalized values for application loading."""
     if not isinstance(payload, dict) or payload.get("format") != PROJECT_FORMAT:
         raise ValueError("Axral World Project形式ではありません。")
-    if payload.get("schema_version") != PROJECT_SCHEMA_VERSION:
+    schema_version = payload.get("schema_version")
+    if (isinstance(schema_version, bool)
+            or not isinstance(schema_version, int)
+            or schema_version != PROJECT_SCHEMA_VERSION):
         raise ValueError(
-            f"未対応のプロジェクトschema_versionです: {payload.get('schema_version')!r}"
+            f"未対応のプロジェクトschema_versionです: {schema_version!r}"
         )
     text = payload.get("text")
     if not isinstance(text, str):
