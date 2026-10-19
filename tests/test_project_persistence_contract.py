@@ -91,27 +91,21 @@ class ProjectPersistenceContractTests(unittest.TestCase):
         self.assertEqual(restored["ignored_candidates"], [(3, "主人公", "東京", "移動")])
 
     def test_ignored_candidate_signature_contract(self):
-        valid = [3, "主人公", "東京", "移動"]
-        invalid = [
-            [3, "主人公", "東京"],
-            ["3", "主人公", "東京", "移動"],
-            [3, "主人公", "東京", None],
+        project = self.project_fixture()
+        project["ignored_candidates"] = [
+            [3.0, "主人公", "東京", "移動"],
+            [3.5, "主人公", "東京", "移動"],
             [True, "主人公", "東京", "移動"],
+            ["3", "主人公", "東京", "移動"],
+            [3, "主人公", "東京"],
+            [3, "主人公", "東京", None],
         ]
 
-        def is_portable_signature(value):
-            return (
-                isinstance(value, list)
-                and len(value) == 4
-                and isinstance(value[0], int)
-                and not isinstance(value[0], bool)
-                and all(isinstance(part, str) for part in value[1:])
-            )
-
-        self.assertTrue(is_portable_signature(valid))
-        for signature in invalid:
-            with self.subTest(signature=signature):
-                self.assertFalse(is_portable_signature(signature))
+        restored = parse_project(project)
+        self.assertEqual(
+            restored["ignored_candidates"],
+            [(3, "主人公", "東京", "移動")],
+        )
 
 
     def test_timeline_fields_normalize_like_web_codec(self):
