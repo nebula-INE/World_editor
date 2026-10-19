@@ -106,7 +106,9 @@ def parse_project(payload: Any) -> dict[str, Any]:
     if not isinstance(text, str):
         raise ValueError("textフィールドがありません。")
 
-    events_data = payload.get("events", [])
+    if "events" not in payload:
+        raise ValueError("eventsフィールドがありません。")
+    events_data = payload["events"]
     if not isinstance(events_data, list):
         raise ValueError("eventsは配列である必要があります。")
     events = []
