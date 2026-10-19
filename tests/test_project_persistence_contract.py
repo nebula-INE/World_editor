@@ -80,6 +80,11 @@ class ProjectPersistenceContractTests(unittest.TestCase):
             stable_relation_id("主人公->東京#0"),
         )
         self.assertEqual(restored["events"][0].to_dict(), project["events"][0])
+        # JSON's 1.0 is the same numeric value as 1 in JavaScript; both codecs accept it.
+        numeric_version = {**project, "schema_version": 1.0}
+        numeric_version["events"] = [{**project["events"][0], "schema_version": 1.0}]
+        normalized_numeric_version = parse_project(numeric_version)
+        self.assertEqual(normalized_numeric_version["events"][0].schema_version, 1)
         self.assertEqual(restored["graph_positions"], project["graph_positions"])
         self.assertEqual(restored["timeline"], project["timeline"])
         self.assertEqual(restored["ignored_candidates"], [(3, "主人公", "東京", "移動")])
@@ -137,6 +142,7 @@ class ProjectPersistenceContractTests(unittest.TestCase):
         invalid_payloads = [
             {**project, "schema_version": 2},
             {**project, "schema_version": True},
+            {**project, "schema_version": 1.5},
             {**project, "text": None},
             {key: value for key, value in project.items() if key != "events"},
             {**project, "events": [None]},
@@ -169,6 +175,7 @@ class ProjectPersistenceContractTests(unittest.TestCase):
             ("effects", {}),
             ("is_snapshot_point", "true"),
             ("schema_version", True),
+            ("schema_version", 1.5),
             ("schema_version", 1.5),
             ("metadata", []),
         ]:
