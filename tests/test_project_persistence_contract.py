@@ -112,7 +112,7 @@ class ProjectPersistenceContractTests(unittest.TestCase):
         project = self.project_fixture()
         project["timeline"] = {
             "mode": "true",
-            "timestamp": float("nan"),
+            "timestamp": 10**1000,
             "visible_layers": ["Su-ken", 42, None],
         }
         restored = parse_project(project)
@@ -138,6 +138,7 @@ class ProjectPersistenceContractTests(unittest.TestCase):
             {**project, "schema_version": 2},
             {**project, "schema_version": True},
             {**project, "schema_version": 1.5},
+            {**project, "schema_version": 10**1000},
             {**project, "text": None},
             {key: value for key, value in project.items() if key != "events"},
             {**project, "events": [None]},
@@ -164,6 +165,7 @@ class ProjectPersistenceContractTests(unittest.TestCase):
             ("id", None),
             ("timestamp", True),
             ("timestamp", float("nan")),
+            ("timestamp", 10**1000),
             ("type", 7),
             ("participants", ["主人公", 3]),
             ("participants", {}),
