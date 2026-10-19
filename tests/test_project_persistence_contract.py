@@ -100,25 +100,17 @@ class ProjectPersistenceContractTests(unittest.TestCase):
             ["3", "主人公", "東京", "移動"],
             [3, "主人公", "東京"],
             [3, "主人公", "東京", None],
-        ]
-
-        restored = parse_project(project)
-        self.assertEqual(
-            restored["ignored_candidates"],
-            [(3, "主人公", "東京", "移動")],
-        )
-
-
-    def test_ignored_candidate_signature_contract(self):
-        project = self.project_fixture()
-        project["ignored_candidates"] = [
             [2**53 - 1, "主人公", "東京", "移動"],
             [2**53, "主人公", "東京", "移動"],
         ]
+
         restored = parse_project(project)
         self.assertEqual(
             restored["ignored_candidates"],
-            [(2**53 - 1, "主人公", "東京", "移動")],
+            [
+                (3, "主人公", "東京", "移動"),
+                (2**53 - 1, "主人公", "東京", "移動"),
+            ],
         )
 
     def test_timeline_fields_normalize_like_web_codec(self):
