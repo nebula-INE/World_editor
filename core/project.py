@@ -168,8 +168,8 @@ def parse_project(payload: Any) -> dict[str, Any]:
         if (isinstance(signature, list) and len(signature) == 4
                 and not isinstance(signature[0], bool)
                 and isinstance(signature[0], (int, float))
-                and (not isinstance(signature[0], float)
-                     or (math.isfinite(signature[0]) and signature[0].is_integer()))
+                and _is_finite_number(signature[0])
+                and (not isinstance(signature[0], float) or signature[0].is_integer())
                 and all(isinstance(part, str) for part in signature[1:])):
             # JavaScript Number.isInteger accepts JSON values such as 3.0;
             # normalize to int so Desktop and Web retain the same signature shape.
