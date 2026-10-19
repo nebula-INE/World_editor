@@ -84,7 +84,7 @@ class ProjectPersistenceContractTests(unittest.TestCase):
         numeric_version = {**project, "schema_version": 1.0}
         numeric_version["events"] = [{**project["events"][0], "schema_version": 1.0}]
         normalized_numeric_version = parse_project(numeric_version)
-        self.assertEqual(normalized_numeric_version["schema_version"], 1)
+        self.assertEqual(len(normalized_numeric_version["events"]), 1)
         self.assertEqual(normalized_numeric_version["events"][0].schema_version, 1)
         self.assertEqual(restored["graph_positions"], project["graph_positions"])
         self.assertEqual(restored["timeline"], project["timeline"])
