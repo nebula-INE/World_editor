@@ -16,14 +16,16 @@ PROJECT_SCHEMA_VERSION = 1
 
 
 def _is_finite_number(value: Any) -> bool:
-    """Return whether a JSON numeric value is finite without leaking OverflowError."""
+    """Accept finite numbers whose integral values are exactly representable in JavaScript."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return False
+    if isinstance(value, int):
+        return abs(value) <= (2**53 - 1)
     try:
-        return math.isfinite(value)
+        return math.isfinite(value) and (
+            not value.is_integer() or abs(value) <= (2**53 - 1)
+        )
     except OverflowError:
-        # Python keeps arbitrarily large JSON integers; JavaScript parses such
-        # values as non-finite Numbers once they exceed its numeric range.
         return False
 
 
