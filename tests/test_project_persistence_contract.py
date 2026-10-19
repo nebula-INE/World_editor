@@ -121,6 +121,10 @@ class ProjectPersistenceContractTests(unittest.TestCase):
             {"mode": False, "timestamp": 0, "visible_layers": ["Su-ken"]},
         )
 
+        project["timeline"] = {"mode": True, "timestamp": 42.9, "visible_layers": ["Su-ken"]}
+        fractional = parse_project(project)
+        self.assertEqual(fractional["timeline"]["timestamp"], 42)
+
         project.pop("timeline")
         restored_without_timeline = parse_project(project)
         self.assertEqual(
