@@ -95,6 +95,7 @@ class ProjectPersistenceContractTests(unittest.TestCase):
         project["ignored_candidates"] = [
             [3.0, "主人公", "東京", "移動"],
             [3.5, "主人公", "東京", "移動"],
+            [10**1000, "主人公", "東京", "移動"],
             [True, "主人公", "東京", "移動"],
             ["3", "主人公", "東京", "移動"],
             [3, "主人公", "東京"],
