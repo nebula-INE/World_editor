@@ -15,6 +15,18 @@ PROJECT_FORMAT = "axral-world-project"
 PROJECT_SCHEMA_VERSION = 1
 
 
+def _is_finite_number(value: Any) -> bool:
+    """Return whether a JSON numeric value is finite without leaking OverflowError."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        # Python keeps arbitrarily large JSON integers; JavaScript parses such
+        # values as non-finite Numbers once they exceed its numeric range.
+        return False
+
+
 def build_project(
     text: str,
     events: list[Event],
@@ -45,8 +57,7 @@ def _parse_event(item: dict[str, Any], index: int) -> Event:
     event_type = item.get("type")
     if not isinstance(event_id, str):
         raise ValueError(f"{prefix}.idは文字列である必要があります。")
-    if (isinstance(timestamp, bool) or not isinstance(timestamp, (int, float))
-            or not math.isfinite(timestamp)):
+    if not _is_finite_number(timestamp):
         raise ValueError(f"{prefix}.timestampは有限数である必要があります。")
     if not isinstance(event_type, str):
         raise ValueError(f"{prefix}.typeは文字列である必要があります。")
@@ -77,9 +88,7 @@ def _parse_event(item: dict[str, Any], index: int) -> Event:
     if not isinstance(snapshot, bool):
         raise ValueError(f"{prefix}.is_snapshot_pointは真偽値である必要があります。")
     schema_version = item.get("schema_version", SCHEMA_VERSION)
-    if (isinstance(schema_version, bool)
-            or not isinstance(schema_version, (int, float))
-            or not math.isfinite(schema_version)
+    if (not _is_finite_number(schema_version)
             or (isinstance(schema_version, float) and not schema_version.is_integer())):
         raise ValueError(f"{prefix}.schema_versionは整数である必要があります。")
     schema_version = int(schema_version)
@@ -103,10 +112,7 @@ def parse_project(payload: Any) -> dict[str, Any]:
     if not isinstance(payload, dict) or payload.get("format") != PROJECT_FORMAT:
         raise ValueError("Axral World Project形式ではありません。")
     schema_version = payload.get("schema_version")
-    if (isinstance(schema_version, bool)
-            or not isinstance(schema_version, (int, float))
-            or not math.isfinite(schema_version)
-            or schema_version != PROJECT_SCHEMA_VERSION):
+    if not _is_finite_number(schema_version) or schema_version != PROJECT_SCHEMA_VERSION:
         raise ValueError(
             f"未対応のプロジェクトschema_versionです: {schema_version!r}"
         )
@@ -135,7 +141,7 @@ def parse_project(payload: Any) -> dict[str, Any]:
     if not isinstance(mode, bool):
         mode = False
     timestamp = timeline_data.get("timestamp", 0)
-    if isinstance(timestamp, bool) or not isinstance(timestamp, (int, float)) or not math.isfinite(timestamp):
+    if not _is_finite_number(timestamp):
         timestamp = 0
     else:
         timestamp = int(timestamp)
@@ -154,7 +160,7 @@ def parse_project(payload: Any) -> dict[str, Any]:
             raise ValueError("graph_positionsの形式が不正です。")
         for axis in ("x", "y"):
             value = point.get(axis)
-            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            if not _is_finite_number(value):
                 raise ValueError(f"graph_positions.{entity_id}.{axis}は有限数である必要があります。")
 
     normalized_ignored = []
