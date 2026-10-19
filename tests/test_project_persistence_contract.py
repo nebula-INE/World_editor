@@ -109,6 +109,18 @@ class ProjectPersistenceContractTests(unittest.TestCase):
         )
 
 
+    def test_ignored_candidate_signature_contract(self):
+        project = self.project_fixture()
+        project["ignored_candidates"] = [
+            [2**53 - 1, "主人公", "東京", "移動"],
+            [2**53, "主人公", "東京", "移動"],
+        ]
+        restored = parse_project(project)
+        self.assertEqual(
+            restored["ignored_candidates"],
+            [(2**53 - 1, "主人公", "東京", "移動")],
+        )
+
     def test_timeline_fields_normalize_like_web_codec(self):
         project = self.project_fixture()
         project["timeline"] = {
@@ -125,6 +137,10 @@ class ProjectPersistenceContractTests(unittest.TestCase):
         project["timeline"] = {"mode": True, "timestamp": 42.9, "visible_layers": ["Su-ken"]}
         fractional = parse_project(project)
         self.assertEqual(fractional["timeline"]["timestamp"], 42)
+
+        project["timeline"] = {"mode": True, "timestamp": 2**53, "visible_layers": ["Su-ken"]}
+        unsafe_integer = parse_project(project)
+        self.assertEqual(unsafe_integer["timeline"]["timestamp"], 0)
 
         project.pop("timeline")
         restored_without_timeline = parse_project(project)
@@ -167,6 +183,7 @@ class ProjectPersistenceContractTests(unittest.TestCase):
             ("timestamp", True),
             ("timestamp", float("nan")),
             ("timestamp", 10**1000),
+            ("timestamp", 2**53),
             ("type", 7),
             ("participants", ["主人公", 3]),
             ("participants", {}),
