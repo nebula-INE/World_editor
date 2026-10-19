@@ -136,6 +136,7 @@ class ProjectPersistenceContractTests(unittest.TestCase):
         project = self.project_fixture()
         invalid_payloads = [
             {**project, "schema_version": 2},
+            {**project, "schema_version": True},
             {**project, "text": None},
             {key: value for key, value in project.items() if key != "events"},
             {**project, "events": [None]},
