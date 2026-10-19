@@ -160,9 +160,14 @@ def parse_project(payload: Any) -> dict[str, Any]:
     normalized_ignored = []
     for signature in ignored:
         if (isinstance(signature, list) and len(signature) == 4
-                and isinstance(signature[0], int) and not isinstance(signature[0], bool)
+                and not isinstance(signature[0], bool)
+                and isinstance(signature[0], (int, float))
+                and (not isinstance(signature[0], float)
+                     or (math.isfinite(signature[0]) and signature[0].is_integer()))
                 and all(isinstance(part, str) for part in signature[1:])):
-            normalized_ignored.append(tuple(signature))
+            # JavaScript Number.isInteger accepts JSON values such as 3.0;
+            # normalize to int so Desktop and Web retain the same signature shape.
+            normalized_ignored.append((int(signature[0]), *signature[1:]))
     return {
         "text": text,
         "events": events,
