@@ -114,6 +114,7 @@ from ui.candidate_panel import CandidatePanel
 from ui.graph_view import GraphView
 from ui.linter_panel import LinterPanel
 from ui.timeline_panel import AddEventDialog, TimelinePanel
+from ui.story_authoring import StoryAuthoringDialog
 
 GENERATED_SECTION_HEADING = "# Generated Relations"
 
@@ -226,9 +227,19 @@ class MainWindow(QMainWindow):
         export_action = file_menu.addAction("Export Canonical Data (JSON)...")
         export_action.triggered.connect(self._export_json)
 
+        file_menu.addSeparator()
+        story_action = file_menu.addAction("Story Authoring...")
+        story_action.triggered.connect(self._open_story_authoring)
+
         patches_menu = self.menuBar().addMenu("Patches")
         resolve_action = patches_menu.addAction("Resolve Conflicts...")
         resolve_action.triggered.connect(self._resolve_conflicts)
+
+    def _open_story_authoring(self) -> None:
+        # Story files use their own dialog and .axral-story.json persistence.
+        # Existing world-project open/save/export handlers remain unchanged.
+        dialog = StoryAuthoringDialog(self)
+        dialog.exec()
 
     def _open_text(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Open Codex Text", "", "Text (*.txt *.md)")
