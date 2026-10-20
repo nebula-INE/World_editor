@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QListWidget, QMessageBox, QPlainTextEdit, QPushButton, QSplitter,
     QVBoxLayout, QWidget,
 )
-from core.story import BLOCK_TYPES, WORK_KINDS, parse_story
+from core.story import BLOCK_TYPES, WORK_KINDS, parse_story, serialize_story
 from core.story_editing import (
     add_chapter, rename_chapter, reorder_chapter, delete_chapter,
     add_scene, rename_scene, reorder_scene, delete_scene,
@@ -39,6 +39,7 @@ class StoryAuthoringDialog(QDialog):
         self.setWindowTitle("Axral Story Authoring")
         self.resize(1080, 720)
         self.story = _empty_story()
+        self._dirty = False
         self.current_chapter_id: str | None = None
         self.current_scene_id: str | None = None
         self._loading = False
@@ -122,7 +123,20 @@ class StoryAuthoringDialog(QDialog):
         self.speaker.textChanged.connect(self._speaker_changed)
         self._refresh_chapters()
 
-    def _set_status(self, text: str) -> None: self.status.setText(text)
+    def _set_status(self, text: str) -> None:
+        self.status.setText(text + (" · 未保存の変更あり" if self._dirty else ""))
+    def _mark_dirty(self) -> None:
+        self._dirty = True
+        self._set_status("未保存の変更があります。")
+    def _confirm_discard(self, action: str) -> bool:
+        if not self._dirty:
+            return True
+        return QMessageBox.question(self, "未保存の変更", f"保存していない変更があります。{action}すると変更は失われます。続行しますか？", QMessageBox.Yes | QMessageBox.No, QMessageBox.No) == QMessageBox.Yes
+    def closeEvent(self, event) -> None:
+        if self._confirm_discard("閉じる"):
+            event.accept()
+        else:
+            event.ignore()
     def _chapter(self) -> dict[str, Any] | None:
         return next((c for c in self.story["chapters"] if c["id"] == self.current_chapter_id), None)
     def _scene(self) -> dict[str, Any] | None:
@@ -169,9 +183,11 @@ class StoryAuthoringDialog(QDialog):
         s=self._scene(); self.scene_title.setText(s["title"] if s else ""); self.scene_title.setEnabled(s is not None)
         self._loading=False
     def _title_changed(self, value: str) -> None:
-        if not self._loading: self.story["title"]=value
+        if not self._loading:
+            self.story["title"]=value; self._mark_dirty()
     def _kind_changed(self, _index: int) -> None:
-        if not self._loading: self.story["kind"]=self.kind_combo.currentData()
+        if not self._loading:
+            self.story["kind"]=self.kind_combo.currentData(); self._mark_dirty()
     def _chapter_selected(self, row: int) -> None:
         if self._loading:return
         c=self.story["chapters"]; self.current_chapter_id=c[row]["id"] if 0<=row<len(c) else None
@@ -185,13 +201,13 @@ class StoryAuthoringDialog(QDialog):
         if not self._loading:self._load_block_fields()
     def _chapter_title_changed(self, value: str) -> None:
         if self._loading or not self.current_chapter_id:return
-        self.story=rename_chapter(self.story,self.current_chapter_id,value)
+        self.story=rename_chapter(self.story,self.current_chapter_id,value); self._mark_dirty()
         row=next((i for i,c in enumerate(self.story["chapters"]) if c["id"]==self.current_chapter_id),-1)
         if row>=0:
             self._loading=True; self.chapters.item(row).setText(value); self._loading=False
     def _scene_title_changed(self, value: str) -> None:
         if self._loading or not self.current_scene_id:return
-        self.story=rename_scene(self.story,self.current_scene_id,value)
+        self.story=rename_scene(self.story,self.current_scene_id,value); self._mark_dirty()
         c=self._chapter()
         if c:
             self._loading=True; row=next((i for i,s in enumerate(c["scenes"]) if s["id"]==self.current_scene_id),-1)
@@ -201,68 +217,70 @@ class StoryAuthoringDialog(QDialog):
         if self._loading:return
         b=self._block()
         if b:
-            try:self.story=update_block(self.story,b["id"],{"text":self.body.toPlainText()})
+            try:self.story=update_block(self.story,b["id"],{"text":self.body.toPlainText()}); self._mark_dirty()
             except ValueError as exc:self._set_status(str(exc))
     def _block_type_changed(self, _index: int) -> None:
         if self._loading:return
         b=self._block()
         if b:
-            self.story=update_block(self.story,b["id"],{"type":self.block_type.currentData()})
+            self.story=update_block(self.story,b["id"],{"type":self.block_type.currentData()}); self._mark_dirty()
             self._refresh_blocks(self.blocks.currentRow())
     def _speaker_changed(self, value: str) -> None:
         if self._loading:return
         b=self._block()
-        if b and b["type"]=="dialogue":self.story=update_block(self.story,b["id"],{"character_id":value or None})
+        if b and b["type"]=="dialogue":
+            self.story=update_block(self.story,b["id"],{"character_id":value or None}); self._mark_dirty()
     def add_chapter(self) -> None:
         title=f'第{len(self.story["chapters"])+1}章'; ident=_id()
-        self.story=add_chapter(self.story,ident,title); self.current_chapter_id=ident; self.current_scene_id=None; self._refresh_chapters(ident); self._set_status("章を追加しました。")
+        self.story=add_chapter(self.story,ident,title); self._mark_dirty(); self.current_chapter_id=ident; self.current_scene_id=None; self._refresh_chapters(ident); self._set_status("章を追加しました。")
     def remove_chapter(self) -> None:
         c=self._chapter()
         if not c:return
         if QMessageBox.question(self,"章を削除","この章と配下のシーン・本文を削除しますか？") != QMessageBox.Yes:return
-        self.story=delete_chapter(self.story,c["id"]); self.current_chapter_id=None; self.current_scene_id=None; self._refresh_chapters(); self._set_status("章を削除しました。")
+        self.story=delete_chapter(self.story,c["id"]); self._mark_dirty(); self.current_chapter_id=None; self.current_scene_id=None; self._refresh_chapters(); self._set_status("章を削除しました。")
     def move_chapter(self, delta: int) -> None:
         c=self._chapter()
         if not c:return
         to=c["order"]+delta
-        if 0<=to<len(self.story["chapters"]): self.story=reorder_chapter(self.story,c["id"],to); self._refresh_chapters(c["id"])
+        if 0<=to<len(self.story["chapters"]): self.story=reorder_chapter(self.story,c["id"],to); self._mark_dirty(); self._refresh_chapters(c["id"])
     def add_scene(self) -> None:
         c=self._chapter()
         if not c:return
-        ident=_id(); self.story=add_scene(self.story,c["id"],ident,f'シーン {len(c["scenes"])+1}'); self.current_scene_id=ident; self._refresh_scenes(ident); self._set_status("シーンを追加しました。")
+        ident=_id(); self.story=add_scene(self.story,c["id"],ident,f'シーン {len(c["scenes"])+1}'); self._mark_dirty(); self.current_scene_id=ident; self._refresh_scenes(ident); self._set_status("シーンを追加しました。")
     def remove_scene(self) -> None:
         s=self._scene()
         if not s:return
         if QMessageBox.question(self,"シーンを削除","このシーンの本文を削除しますか？") != QMessageBox.Yes:return
-        self.story=delete_scene(self.story,s["id"]); self.current_scene_id=None; self._refresh_scenes(); self._set_status("シーンを削除しました。")
+        self.story=delete_scene(self.story,s["id"]); self._mark_dirty(); self.current_scene_id=None; self._refresh_scenes(); self._set_status("シーンを削除しました。")
     def move_scene(self, delta: int) -> None:
         s=self._scene()
         if not s:return
         to=s["order"]+delta
-        if 0<=to<len(self._chapter()["scenes"]): self.story=reorder_scene(self.story,s["id"],to); self._refresh_scenes(s["id"])
+        if 0<=to<len(self._chapter()["scenes"]): self.story=reorder_scene(self.story,s["id"],to); self._mark_dirty(); self._refresh_scenes(s["id"])
     def add_text_block(self) -> None:
         s=self._scene()
         if not s:return
-        ident=_id(); self.story=add_block(self.story,s["id"],{"id":ident,"type":self.block_type.currentData(),"text":""}); self._refresh_blocks(len(s["blocks"])); self._set_status("本文ブロックを追加しました。")
+        ident=_id(); self.story=add_block(self.story,s["id"],{"id":ident,"type":self.block_type.currentData(),"text":""}); self._mark_dirty(); self._refresh_blocks(len(s["blocks"])); self._set_status("本文ブロックを追加しました。")
     def remove_block(self) -> None:
         b=self._block()
         if not b:return
-        self.story=delete_block(self.story,b["id"]); self._refresh_blocks(min(self.blocks.currentRow(),len(self._scene()["blocks"])-1)); self._set_status("本文ブロックを削除しました。")
+        self.story=delete_block(self.story,b["id"]); self._mark_dirty(); self._refresh_blocks(min(self.blocks.currentRow(),len(self._scene()["blocks"])-1)); self._set_status("本文ブロックを削除しました。")
     def move_block(self, delta: int) -> None:
         b=self._block(); s=self._scene()
         if not b or not s:return
         to=b["order"]+delta
-        if 0<=to<len(s["blocks"]): self.story=reorder_block(self.story,b["id"],to); self._refresh_blocks(to)
+        if 0<=to<len(s["blocks"]): self.story=reorder_block(self.story,b["id"],to); self._mark_dirty(); self._refresh_blocks(to)
     def new_story(self) -> None:
-        if self.story["chapters"] and QMessageBox.question(self,"新規物語","現在の物語を閉じますか？") != QMessageBox.Yes:return
-        self.story=_empty_story(); self.current_chapter_id=None; self.current_scene_id=None
+        if not self._confirm_discard("新規作成"): return
+        self.story=_empty_story(); self._dirty=False; self.current_chapter_id=None; self.current_scene_id=None
         self._loading=True; self.title_edit.setText(self.story["title"]); self.kind_combo.setCurrentIndex(self.kind_combo.findData("novel")); self._loading=False
         self._refresh_chapters(); self._set_status("新しい物語です。")
     def open_story(self) -> None:
+        if not self._confirm_discard("別の物語を開く"): return
         path,_=QFileDialog.getOpenFileName(self,"物語ファイルを開く","","Axral Story (*"+STORY_FILE_SUFFIX+")")
         if not path:return
         try:
-            self.story=load_story_file(path); self.current_chapter_id=self.story["chapters"][0]["id"] if self.story["chapters"] else None
+            self.story=load_story_file(path); self._dirty=False; self.current_chapter_id=self.story["chapters"][0]["id"] if self.story["chapters"] else None
             self.current_scene_id=None; self._loading=True; self.title_edit.setText(self.story["title"]); self.kind_combo.setCurrentIndex(self.kind_combo.findData(self.story["kind"])); self._loading=False
             self._refresh_chapters(self.current_chapter_id); self._set_status(f"読み込みました: {Path(path).name}")
         except (ValueError,OSError) as exc: QMessageBox.warning(self,"物語ファイルを開けません",str(exc))
@@ -271,5 +289,5 @@ class StoryAuthoringDialog(QDialog):
         if not path:return
         if not path.lower().endswith(STORY_FILE_SUFFIX):path+=STORY_FILE_SUFFIX
         try:
-            save_story_file(path,parse_story(self.story)); self._set_status(f"保存しました: {Path(path).name}")
+            save_story_file(path,parse_story(self.story)); self._dirty=False; self._set_status(f"保存しました: {Path(path).name}")
         except (ValueError,OSError) as exc: QMessageBox.warning(self,"物語ファイルを保存できません",str(exc))
