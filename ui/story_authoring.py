@@ -40,6 +40,7 @@ class StoryAuthoringDialog(QDialog):
         self.resize(1080, 720)
         self.story = _empty_story()
         self._dirty = False
+        self._saved_snapshot = serialize_story(self.story)
         self.current_chapter_id: str | None = None
         self.current_scene_id: str | None = None
         self._loading = False
@@ -126,8 +127,11 @@ class StoryAuthoringDialog(QDialog):
     def _set_status(self, text: str) -> None:
         self.status.setText(text + (" · 未保存の変更あり" if self._dirty else ""))
     def _mark_dirty(self) -> None:
-        self._dirty = True
-        self._set_status("未保存の変更があります。")
+        try:
+            self._dirty = serialize_story(self.story) != self._saved_snapshot
+        except (TypeError, ValueError):
+            self._dirty = True
+        self._set_status("未保存の変更があります。" if self._dirty else "変更は保存済みです。")
     def _confirm_discard(self, action: str) -> bool:
         if not self._dirty:
             return True
@@ -272,7 +276,7 @@ class StoryAuthoringDialog(QDialog):
         if 0<=to<len(s["blocks"]): self.story=reorder_block(self.story,b["id"],to); self._mark_dirty(); self._refresh_blocks(to)
     def new_story(self) -> None:
         if not self._confirm_discard("新規作成"): return
-        self.story=_empty_story(); self._dirty=False; self.current_chapter_id=None; self.current_scene_id=None
+        self.story=_empty_story(); self._saved_snapshot=serialize_story(self.story); self._dirty=False; self.current_chapter_id=None; self.current_scene_id=None
         self._loading=True; self.title_edit.setText(self.story["title"]); self.kind_combo.setCurrentIndex(self.kind_combo.findData("novel")); self._loading=False
         self._refresh_chapters(); self._set_status("新しい物語です。")
     def open_story(self) -> None:
@@ -280,7 +284,7 @@ class StoryAuthoringDialog(QDialog):
         path,_=QFileDialog.getOpenFileName(self,"物語ファイルを開く","","Axral Story (*"+STORY_FILE_SUFFIX+")")
         if not path:return
         try:
-            self.story=load_story_file(path); self._dirty=False; self.current_chapter_id=self.story["chapters"][0]["id"] if self.story["chapters"] else None
+            self.story=load_story_file(path); self._saved_snapshot=serialize_story(self.story); self._dirty=False; self.current_chapter_id=self.story["chapters"][0]["id"] if self.story["chapters"] else None
             self.current_scene_id=None; self._loading=True; self.title_edit.setText(self.story["title"]); self.kind_combo.setCurrentIndex(self.kind_combo.findData(self.story["kind"])); self._loading=False
             self._refresh_chapters(self.current_chapter_id); self._set_status(f"読み込みました: {Path(path).name}")
         except (ValueError,OSError) as exc: QMessageBox.warning(self,"物語ファイルを開けません",str(exc))
@@ -289,5 +293,5 @@ class StoryAuthoringDialog(QDialog):
         if not path:return
         if not path.lower().endswith(STORY_FILE_SUFFIX):path+=STORY_FILE_SUFFIX
         try:
-            save_story_file(path,parse_story(self.story)); self._dirty=False; self._set_status(f"保存しました: {Path(path).name}")
+            save_story_file(path,parse_story(self.story)); self._saved_snapshot=serialize_story(self.story); self._dirty=False; self._set_status(f"保存しました: {Path(path).name}")
         except (ValueError,OSError) as exc: QMessageBox.warning(self,"物語ファイルを保存できません",str(exc))
