@@ -1685,3 +1685,125 @@ Relation IDs are derived as `rel_` + SHA-1(UTF-8(`ref_key`))[:12]. `ref_key` rem
 - `.axral.json` now serializes `ignored_candidates` as arrays `[line, source_name, target_name, rel_type]`, matching the Desktop signature contract.
 - Web keeps the same signature internally instead of persisting ephemeral `cand_*` IDs; Desktop validates the four-field tuple when loading.
 - This resolves cross-platform candidate-ignore identity for newly saved projects. Full interactive Web-save → Desktop-open and Desktop-save → Web-open GUI round-trip checks remain a release validation item; CI build checks alone do not prove runtime UI behavior.
+
+
+# 29. Story Authoring Expansion — Web/Desktop Parity (2026-10-20)
+
+## 29.1 Goal
+
+Axral Codex must support not only worldbuilding and setting management, but also the planning, writing, structuring, checking, and delivery of a broad range of creative works. The goal is to let users move from a world and its facts to a complete work without forcing every genre into a graph-only workflow.
+
+This roadmap applies equally to **World_editor_web** and **World_editor (Desktop)**. Neither platform is the reference implementation for feature scope: every user-facing feature in this section must be planned, implemented, and released for both platforms with equivalent behavior.
+
+## 29.2 Supported Work Types
+
+The data model should be format-neutral, with format-specific views and validation rules. Initial target types:
+
+- **Novel / short story:** chapters, scenes, prose, dialogue, narration, notes.
+- **Screenplay / stage play:** acts, scenes, character cues, dialogue, stage directions, transitions.
+- **Voice drama / audio script:** dialogue, narrator lines, speaker identity, delivery notes, sound effects, music cues, timing notes.
+- **Game scenario / visual novel:** scenes, dialogue, choices, conditions, flags, routes, endings.
+- **TRPG / interactive scenario:** scenes, locations, NPCs, player-facing text, branches, clues, triggers, outcomes.
+- **Comic / storyboard:** pages, panels, shot descriptions, dialogue, captions, visual directions.
+
+These are progressively enabled formats, not a requirement to implement every specialized editor in the first milestone. All should share the same underlying work/scene/block model wherever possible.
+
+## 29.3 Shared Authoring Model
+
+Add a canonical authoring layer alongside the existing worldbuilding model. Do not make the graph or timeline the only way to author a work.
+
+Core concepts:
+
+- **Work:** title, format, synopsis, status, metadata.
+- **Act / Chapter:** optional hierarchical containers appropriate to the format.
+- **Scene:** ordered unit with location, time, purpose, participants, and links to relevant world events.
+- **Block:** ordered content unit with a type such as prose, dialogue, narration, stage direction, sound cue, visual direction, or note.
+- **Character / Place / Organization links:** references to existing canonical entities, not duplicated free-standing copies.
+- **Choice / Condition / Flag / Route / Ending:** optional branching structures for interactive formats.
+- **Thread:** foreshadowing, unresolved question, clue, promise, or continuity item with introduction and resolution references.
+- **Source / Reference link:** traceable relationship between authored text and world facts/events.
+
+Stable IDs and explicit ordering are required. Missing references should be reported as validation findings, not silently discarded.
+
+## 29.4 Authoring UX
+
+Provide a dedicated writing workflow in addition to the existing text-to-graph and canvas workflow:
+
+1. Work browser / project overview.
+2. Outline tree for acts, chapters, scenes, and branches.
+3. Scene editor with reorderable, typed content blocks.
+4. Context panel for linked characters, places, events, and relevant setting facts.
+5. Optional canvas and timeline views for structural planning and continuity.
+6. Format-aware preview and export views, introduced only after the shared authoring model is stable.
+7. Validation panel for continuity, unresolved threads, broken links, and branching issues.
+
+Text editing must remain direct and comfortable. Structured views supplement prose; they must not force every sentence to be expressed as a graph relation.
+
+## 29.5 Compatibility and Data Safety — Non-Negotiable
+
+- Do **not** casually change, replace, or refactor the existing project save/load or export processing. Those paths are currently working well and are explicitly out of scope for this feature-planning change.
+- Preserve existing `.axral.json` v1 projects and their current behavior.
+- Before implementation, decide and document whether authoring data belongs in a separate work document linked to a world project, or in a versioned optional extension. Do not silently change the v1 schema.
+- Any future migration must be explicit, backward-compatible where possible, tested with existing fixtures, and designed so opening and saving a project does not lose unknown or newer fields.
+- Keep canonical IDs, ordering, references, and serialization semantics portable between Web and Desktop.
+- Do not implement a Web-only or Desktop-only authoring model.
+
+## 29.6 Phased Delivery
+
+### Phase A — Shared Work Structure
+
+- Define the format-neutral Work / Act / Chapter / Scene / Block model and stable ID rules.
+- Document the file/linking strategy without changing existing save/export handlers.
+- Add model-level fixtures and schema validation tests that both implementations can use.
+- Acceptance: the same fixture produces equivalent structured data in Web and Desktop; existing v1 fixtures remain unchanged and readable.
+
+### Phase B — Outline and Basic Writing
+
+- Add create, rename, reorder, and delete operations for works, chapters, scenes, and blocks.
+- Support prose, dialogue, narration, directions, and notes as typed blocks.
+- Add undo/redo where the platform's existing architecture supports it.
+- Acceptance: a user can draft and reorder a multi-scene short story in both platforms; content and ordering survive close/reopen through the newly approved authoring persistence path.
+
+### Phase C — Worldbuilding Integration
+
+- Link scenes and blocks to canonical characters, locations, organizations, and events.
+- Show relevant setting facts in context without copying or mutating the source facts.
+- Add checks for missing references and conflicting known facts.
+- Acceptance: Web and Desktop resolve the same links and report equivalent validation results for shared fixtures.
+
+### Phase D — Format Profiles and Output Views
+
+- Add format profiles for prose, screenplay/stage, voice drama, game/visual novel, TRPG, and storyboard.
+- Define format-specific block types, preview rules, and output templates.
+- Keep output generation isolated from existing world-project export paths.
+- Acceptance: each implemented profile has shared golden fixtures and output tests on both platforms; unsupported block types are surfaced clearly instead of silently dropped.
+
+### Phase E — Interactive Structure
+
+- Add choices, conditions, flags, routes, and endings.
+- Validate unreachable scenes, broken targets, missing conditions, and routes without endings.
+- Acceptance: both platforms produce equivalent branch graphs and validation findings for the same test scenarios.
+
+### Phase F — Continuity and Editorial Checks
+
+- Track character knowledge, scene chronology, unresolved threads, foreshadowing, and contradictions against world facts.
+- Distinguish hard errors from warnings and suggestions.
+- Keep automatic language/AI suggestions advisory; never silently rewrite the user's text or canon.
+- Acceptance: checks are deterministic for the same data and clearly explain the source and reason for each finding.
+
+## 29.7 Web/Desktop Parity Contract
+
+For every phase:
+
+1. Define shared behavior and data contracts before platform-specific UI work.
+2. Update both repositories in the same delivery cycle; link the corresponding PRs and commits.
+3. Use common fixtures and equivalent acceptance tests wherever feasible.
+4. Verify Web → Desktop and Desktop → Web opening of supported work/project data, including Unicode/Japanese text, ordering, IDs, references, and empty/optional fields.
+5. Track UI differences explicitly; platform-native layout may differ, but feature availability, semantics, and outcomes must remain equivalent.
+6. Do not call a feature complete until both platforms pass the shared acceptance criteria.
+
+## 29.8 First Implementation Slice
+
+The first implementation slice should be **Phase A plus a minimal Phase B design**, not an immediate rewrite of the parser, world-state engine, graph, timeline, or save/export paths. First settle the authoring schema, persistence boundary, and shared test fixtures. Then implement the smallest useful outline-and-writing workflow on both platforms.
+
+Out of scope for the first slice: AI-generated full stories, automatic rewriting, a complete visual novel runtime, and a broad refactor of existing project serialization or export behavior.
