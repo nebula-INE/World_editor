@@ -141,7 +141,8 @@ class StoryAuthoringDialog(QDialog):
         self.chapter_title.setEnabled(selected is not None)
         self._loading=False
         if idx < 0:
-            self.current_chapter_id=None; self._refresh_scenes()
+            self.current_chapter_id=None
+        self._refresh_scenes()
     def _refresh_scenes(self, select_id: str | None = None) -> None:
         self._loading=True; self.scenes.clear(); c=self._chapter()
         if c:
