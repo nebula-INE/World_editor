@@ -264,7 +264,7 @@ class StoryAuthoringDialog(QDialog):
     def add_text_block(self) -> None:
         s=self._scene()
         if not s:return
-        ident=_id(); self.story=add_block(self.story,s["id"],{"id":ident,"type":self.block_type.currentData(),"text":""}); self._mark_dirty(); self._refresh_blocks(len(s["blocks"])); self._set_status("本文ブロックを追加しました。")
+        ident=_id(); self.story=add_block(self.story,s["id"],{"id":ident,"type":"prose","text":""}); self._mark_dirty(); self._refresh_blocks(len(s["blocks"])); self._set_status("本文ブロックを追加しました。")
     def remove_block(self) -> None:
         b=self._block()
         if not b:return
