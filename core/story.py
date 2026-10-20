@@ -30,7 +30,8 @@ def parse_story(payload: Any) -> dict[str, Any]:
     if isinstance(version, bool) or version != STORY_SCHEMA_VERSION:
         raise ValueError(f"未対応のAxral Story schema_versionです: {version!r}")
     _str(doc.get("work_id"), "work_id"); _str(doc.get("title"), "title")
-    if doc.get("kind") not in WORK_KINDS: raise ValueError("kindは対応する作品種別である必要があります。")
+    kind = doc.get("kind")
+    if not isinstance(kind, str) or kind not in WORK_KINDS: raise ValueError("kindは対応する作品種別である必要があります。")
     if not isinstance(doc.get("chapters"), list): raise ValueError("chaptersは配列である必要があります。")
     ids: set[str] = set()
     def uid(value: Any, path: str) -> None:
@@ -46,7 +47,8 @@ def parse_story(payload: Any) -> dict[str, Any]:
             if not isinstance(s.get("blocks"),list): raise ValueError(f"{sp}.blocksは配列である必要があります。")
             for bi,bv in enumerate(s["blocks"]):
                 bp=f"{sp}.blocks[{bi}]"; b=_obj(bv,bp); uid(b.get("id"),bp+".id")
-                if b.get("type") not in BLOCK_TYPES: raise ValueError(f"{bp}.typeは対応するブロック種別である必要があります。")
+                block_type = b.get("type")
+                if not isinstance(block_type, str) or block_type not in BLOCK_TYPES: raise ValueError(f"{bp}.typeは対応するブロック種別である必要があります。")
                 _order(b.get("order"),bp+".order",bi); _str(b.get("text"),bp+".text")
                 if b.get("character_id") is not None: _str(b["character_id"],bp+".character_id")
                 refs=b.get("entity_refs",[])
