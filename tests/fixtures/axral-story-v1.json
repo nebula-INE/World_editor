@@ -1,0 +1,55 @@
+{
+  "format": "axral-story",
+  "schema_version": 1,
+  "work_id": "work_demo_001",
+  "title": "雨の境界",
+  "kind": "novel",
+  "chapters": [
+    {
+      "id": "chapter_001",
+      "title": "第一章",
+      "order": 0,
+      "scenes": [
+        {
+          "id": "scene_001",
+          "title": "駅のホーム",
+          "order": 0,
+          "blocks": [
+            {
+              "id": "block_001",
+              "type": "direction",
+              "order": 0,
+              "text": "夜。雨がホームの屋根を叩いている。",
+              "character_id": null,
+              "entity_refs": ["ent_8f07c23f5f99"]
+            },
+            {
+              "id": "block_002",
+              "type": "dialogue",
+              "order": 1,
+              "text": "「本当に、行くの？」",
+              "character_id": "ent_8f07c23f5f99",
+              "entity_refs": []
+            },
+            {
+              "id": "block_003",
+              "type": "prose",
+              "order": 2,
+              "text": "彼女は返事をせず、濡れた切符を握りしめた。\n列車のライトが遠くに滲む。",
+              "character_id": null,
+              "entity_refs": ["ent_681ee300008e"]
+            },
+            {
+              "id": "block_004",
+              "type": "note",
+              "order": 3,
+              "text": "この時点では主人公の目的を明かさない。",
+              "character_id": null,
+              "entity_refs": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
