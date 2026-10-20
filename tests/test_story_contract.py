@@ -12,6 +12,8 @@ class StoryContractTests(unittest.TestCase):
         self.assertIn("\n",self.fixture["chapters"][0]["scenes"][0]["blocks"][2]["text"])
     def test_unknown_version_rejected(self):
         with self.assertRaisesRegex(ValueError,"未対応"): parse_story(dict(self.fixture,schema_version=99))
+    def test_boolean_schema_version_rejected(self):
+        with self.assertRaisesRegex(ValueError,"未対応"): parse_story(dict(self.fixture,schema_version=True))
     def test_duplicate_ids_and_bad_order_rejected(self):
         bad=json.loads(json.dumps(self.fixture)); bad["chapters"][0]["scenes"][0]["blocks"][1]["id"]="block_001"
         with self.assertRaisesRegex(ValueError,"重複"): parse_story(bad)
