@@ -184,6 +184,7 @@ class StoryAuthoringDialog(QDialog):
         idx=self.block_type.findData(b["type"]) if b else 0
         self.block_type.setCurrentIndex(max(idx,0))
         self.body.setEnabled(b is not None); self.block_type.setEnabled(b is not None); self.speaker.setEnabled(b is not None)
+        self.speaker.setVisible(bool(b and b["type"] == "dialogue"))
         s=self._scene(); self.scene_title.setText(s["title"] if s else ""); self.scene_title.setEnabled(s is not None)
         self._loading=False
     def _title_changed(self, value: str) -> None:
