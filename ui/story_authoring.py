@@ -28,6 +28,16 @@ BLOCK_LABELS = {"prose": "地の文", "dialogue": "台詞", "narration": "ナレ
 def _id() -> str:
     return uuid.uuid4().hex
 
+def _story_filename(title: str) -> str:
+    """Build a cross-platform-safe default filename for a standalone story."""
+    cleaned = "".join(
+        "_" if char in '<>:"/\\|?*' or ord(char) < 32 else char
+        for char in title.strip()
+    )
+    cleaned = cleaned.rstrip(". ")[:100].rstrip(". ")
+    return (cleaned or "untitled") + STORY_FILE_SUFFIX
+
+
 def _empty_story() -> dict[str, Any]:
     return {"format": "axral-story", "schema_version": 1, "work_id": _id(),
             "title": "無題の物語", "kind": "novel", "chapters": []}
@@ -290,7 +300,7 @@ class StoryAuthoringDialog(QDialog):
             self._refresh_chapters(self.current_chapter_id); self._set_status(f"読み込みました: {Path(path).name}")
         except (ValueError,OSError) as exc: QMessageBox.warning(self,"物語ファイルを開けません",str(exc))
     def save_story(self) -> None:
-        path,_=QFileDialog.getSaveFileName(self,"物語ファイルを保存",self.story["title"]+STORY_FILE_SUFFIX,"Axral Story (*"+STORY_FILE_SUFFIX+")")
+        path,_=QFileDialog.getSaveFileName(self,"物語ファイルを保存",_story_filename(self.story["title"]),"Axral Story (*"+STORY_FILE_SUFFIX+")")
         if not path:return
         if not path.lower().endswith(STORY_FILE_SUFFIX):path+=STORY_FILE_SUFFIX
         try:
