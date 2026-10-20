@@ -65,7 +65,7 @@ def validate_story_references(payload: Any, known_entity_ids: set[str]) -> list[
         for si,s in enumerate(c["scenes"]):
             for bi,b in enumerate(s["blocks"]):
                 refs=list(b.get("entity_refs",[]))
-                if b.get("character_id") is not None: refs.append(b["character_id"])
+                if b.get("character_id"): refs.append(b["character_id"])
                 for ref in refs:
                     if ref not in known_entity_ids:
                         findings.append({"path":f"chapters[{ci}].scenes[{si}].blocks[{bi}]","entity_id":ref,"message":f"参照先の世界設定IDが見つかりません: {ref}"})
