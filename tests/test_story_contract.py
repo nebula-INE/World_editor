@@ -31,6 +31,14 @@ class StoryContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"重複"): parse_story(bad)
         bad=json.loads(json.dumps(self.fixture)); bad["chapters"][0]["scenes"][0]["blocks"][0]["order"]=4
         with self.assertRaisesRegex(ValueError,"配列位置"): parse_story(bad)
+    def test_empty_speaker_id_is_ignored_by_reference_validation(self):
+        payload=json.loads(json.dumps(self.fixture))
+        payload["chapters"][0]["scenes"][0]["blocks"][3]["character_id"]=""
+        known={"ent_8f07c23f5f99"}
+        self.assertEqual(
+            validate_story_references(payload,known),
+            validate_story_references(self.fixture,known),
+        )
     def test_broken_refs_reported_without_mutating_document(self):
         before=json.loads(json.dumps(self.fixture))
         findings=validate_story_references(self.fixture,{"ent_8f07c23f5f99"})
