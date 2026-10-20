@@ -68,6 +68,7 @@ class StoryAuthoringDialog(QDialog):
         left = QWidget(); left_layout = QVBoxLayout(left)
         left_layout.addWidget(QLabel("章"))
         self.chapters = QListWidget(); left_layout.addWidget(self.chapters)
+        self.chapter_title = QLineEdit(); self.chapter_title.setPlaceholderText("章タイトル"); left_layout.addWidget(self.chapter_title)
         row = QHBoxLayout()
         for label, cb in (("＋章", self.add_chapter), ("↑", lambda: self.move_chapter(-1)), ("↓", lambda: self.move_chapter(1)), ("削除", self.remove_chapter)):
             b=QPushButton(label); b.clicked.connect(cb); row.addWidget(b)
@@ -110,6 +111,7 @@ class StoryAuthoringDialog(QDialog):
         root.addWidget(self.status)
 
         self.title_edit.textChanged.connect(self._title_changed)
+        self.chapter_title.textChanged.connect(self._chapter_title_changed)
         self.kind_combo.currentIndexChanged.connect(self._kind_changed)
         self.chapters.currentRowChanged.connect(self._chapter_selected)
         self.scenes.currentRowChanged.connect(self._scene_selected)
@@ -133,7 +135,11 @@ class StoryAuthoringDialog(QDialog):
         self._loading=True; self.chapters.clear()
         for c in self.story["chapters"]: self.chapters.addItem(c["title"])
         idx=next((i for i,c in enumerate(self.story["chapters"]) if c["id"] == (select_id or self.current_chapter_id)),-1)
-        self.chapters.setCurrentRow(idx); self._loading=False
+        self.chapters.setCurrentRow(idx)
+        selected = self.story["chapters"][idx] if idx >= 0 else None
+        self.chapter_title.setText(selected["title"] if selected else "")
+        self.chapter_title.setEnabled(selected is not None)
+        self._loading=False
         if idx < 0:
             self.current_chapter_id=None; self._refresh_scenes()
     def _refresh_scenes(self, select_id: str | None = None) -> None:
@@ -143,7 +149,8 @@ class StoryAuthoringDialog(QDialog):
             idx=next((i for i,s in enumerate(c["scenes"]) if s["id"] == (select_id or self.current_scene_id)),-1)
         else: idx=-1
         self.scenes.setCurrentRow(idx); self._loading=False
-        if idx < 0: self.current_scene_id=None; self._refresh_blocks()
+        if idx < 0: self.current_scene_id=None
+        self._refresh_blocks()
     def _refresh_blocks(self, select_row: int = -1) -> None:
         self._loading=True; self.blocks.clear(); s=self._scene()
         if s:
@@ -175,6 +182,12 @@ class StoryAuthoringDialog(QDialog):
         self._refresh_blocks()
     def _block_selected(self, _row: int) -> None:
         if not self._loading:self._load_block_fields()
+    def _chapter_title_changed(self, value: str) -> None:
+        if self._loading or not self.current_chapter_id:return
+        self.story=rename_chapter(self.story,self.current_chapter_id,value)
+        row=next((i for i,c in enumerate(self.story["chapters"]) if c["id"]==self.current_chapter_id),-1)
+        if row>=0:
+            self._loading=True; self.chapters.item(row).setText(value); self._loading=False
     def _scene_title_changed(self, value: str) -> None:
         if self._loading or not self.current_scene_id:return
         self.story=rename_scene(self.story,self.current_scene_id,value)
