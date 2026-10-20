@@ -80,39 +80,44 @@ class ProjectPersistenceContractTests(unittest.TestCase):
             stable_relation_id("主人公->東京#0"),
         )
         self.assertEqual(restored["events"][0].to_dict(), project["events"][0])
+        # JSON's 1.0 is the same numeric value as 1 in JavaScript; both codecs accept it.
+        numeric_version = {**project, "schema_version": 1.0}
+        numeric_version["events"] = [{**project["events"][0], "schema_version": 1.0}]
+        normalized_numeric_version = parse_project(numeric_version)
+        self.assertEqual(len(normalized_numeric_version["events"]), 1)
+        self.assertEqual(normalized_numeric_version["events"][0].schema_version, 1)
         self.assertEqual(restored["graph_positions"], project["graph_positions"])
         self.assertEqual(restored["timeline"], project["timeline"])
         self.assertEqual(restored["ignored_candidates"], [(3, "主人公", "東京", "移動")])
 
     def test_ignored_candidate_signature_contract(self):
-        valid = [3, "主人公", "東京", "移動"]
-        invalid = [
-            [3, "主人公", "東京"],
-            ["3", "主人公", "東京", "移動"],
-            [3, "主人公", "東京", None],
+        project = self.project_fixture()
+        project["ignored_candidates"] = [
+            [3.0, "主人公", "東京", "移動"],
+            [3.5, "主人公", "東京", "移動"],
+            [10**1000, "主人公", "東京", "移動"],
             [True, "主人公", "東京", "移動"],
+            ["3", "主人公", "東京", "移動"],
+            [3, "主人公", "東京"],
+            [3, "主人公", "東京", None],
+            [2**53 - 1, "主人公", "東京", "移動"],
+            [2**53, "主人公", "東京", "移動"],
         ]
 
-        def is_portable_signature(value):
-            return (
-                isinstance(value, list)
-                and len(value) == 4
-                and isinstance(value[0], int)
-                and not isinstance(value[0], bool)
-                and all(isinstance(part, str) for part in value[1:])
-            )
-
-        self.assertTrue(is_portable_signature(valid))
-        for signature in invalid:
-            with self.subTest(signature=signature):
-                self.assertFalse(is_portable_signature(signature))
-
+        restored = parse_project(project)
+        self.assertEqual(
+            restored["ignored_candidates"],
+            [
+                (3, "主人公", "東京", "移動"),
+                (2**53 - 1, "主人公", "東京", "移動"),
+            ],
+        )
 
     def test_timeline_fields_normalize_like_web_codec(self):
         project = self.project_fixture()
         project["timeline"] = {
             "mode": "true",
-            "timestamp": float("nan"),
+            "timestamp": 10**1000,
             "visible_layers": ["Su-ken", 42, None],
         }
         restored = parse_project(project)
@@ -125,6 +130,10 @@ class ProjectPersistenceContractTests(unittest.TestCase):
         fractional = parse_project(project)
         self.assertEqual(fractional["timeline"]["timestamp"], 42)
 
+        project["timeline"] = {"mode": True, "timestamp": 2**53, "visible_layers": ["Su-ken"]}
+        unsafe_integer = parse_project(project)
+        self.assertEqual(unsafe_integer["timeline"]["timestamp"], 0)
+
         project.pop("timeline")
         restored_without_timeline = parse_project(project)
         self.assertEqual(
@@ -136,7 +145,11 @@ class ProjectPersistenceContractTests(unittest.TestCase):
         project = self.project_fixture()
         invalid_payloads = [
             {**project, "schema_version": 2},
+            {**project, "schema_version": True},
+            {**project, "schema_version": 1.5},
+            {**project, "schema_version": 10**1000},
             {**project, "text": None},
+            {key: value for key, value in project.items() if key != "events"},
             {**project, "events": [None]},
             {
                 **project,
@@ -161,6 +174,8 @@ class ProjectPersistenceContractTests(unittest.TestCase):
             ("id", None),
             ("timestamp", True),
             ("timestamp", float("nan")),
+            ("timestamp", 10**1000),
+            ("timestamp", 2**53),
             ("type", 7),
             ("participants", ["主人公", 3]),
             ("participants", {}),

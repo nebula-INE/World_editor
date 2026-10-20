@@ -15,6 +15,20 @@ PROJECT_FORMAT = "axral-world-project"
 PROJECT_SCHEMA_VERSION = 1
 
 
+def _is_finite_number(value: Any) -> bool:
+    """Accept finite numbers whose integral values are exactly representable in JavaScript."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    if isinstance(value, int):
+        return abs(value) <= (2**53 - 1)
+    try:
+        return math.isfinite(value) and (
+            not value.is_integer() or abs(value) <= (2**53 - 1)
+        )
+    except OverflowError:
+        return False
+
+
 def build_project(
     text: str,
     events: list[Event],
@@ -45,8 +59,7 @@ def _parse_event(item: dict[str, Any], index: int) -> Event:
     event_type = item.get("type")
     if not isinstance(event_id, str):
         raise ValueError(f"{prefix}.idは文字列である必要があります。")
-    if (isinstance(timestamp, bool) or not isinstance(timestamp, (int, float))
-            or not math.isfinite(timestamp)):
+    if not _is_finite_number(timestamp):
         raise ValueError(f"{prefix}.timestampは有限数である必要があります。")
     if not isinstance(event_type, str):
         raise ValueError(f"{prefix}.typeは文字列である必要があります。")
@@ -77,8 +90,10 @@ def _parse_event(item: dict[str, Any], index: int) -> Event:
     if not isinstance(snapshot, bool):
         raise ValueError(f"{prefix}.is_snapshot_pointは真偽値である必要があります。")
     schema_version = item.get("schema_version", SCHEMA_VERSION)
-    if (isinstance(schema_version, bool) or not isinstance(schema_version, int)):
+    if (not _is_finite_number(schema_version)
+            or (isinstance(schema_version, float) and not schema_version.is_integer())):
         raise ValueError(f"{prefix}.schema_versionは整数である必要があります。")
+    schema_version = int(schema_version)
     metadata = item.get("metadata", {})
     if not isinstance(metadata, dict):
         raise ValueError(f"{prefix}.metadataはオブジェクトである必要があります。")
@@ -98,15 +113,18 @@ def parse_project(payload: Any) -> dict[str, Any]:
     """Validate a decoded payload and return normalized values for application loading."""
     if not isinstance(payload, dict) or payload.get("format") != PROJECT_FORMAT:
         raise ValueError("Axral World Project形式ではありません。")
-    if payload.get("schema_version") != PROJECT_SCHEMA_VERSION:
+    schema_version = payload.get("schema_version")
+    if not _is_finite_number(schema_version) or schema_version != PROJECT_SCHEMA_VERSION:
         raise ValueError(
-            f"未対応のプロジェクトschema_versionです: {payload.get('schema_version')!r}"
+            f"未対応のプロジェクトschema_versionです: {schema_version!r}"
         )
     text = payload.get("text")
     if not isinstance(text, str):
         raise ValueError("textフィールドがありません。")
 
-    events_data = payload.get("events", [])
+    if "events" not in payload:
+        raise ValueError("eventsフィールドがありません。")
+    events_data = payload["events"]
     if not isinstance(events_data, list):
         raise ValueError("eventsは配列である必要があります。")
     events = []
@@ -125,7 +143,7 @@ def parse_project(payload: Any) -> dict[str, Any]:
     if not isinstance(mode, bool):
         mode = False
     timestamp = timeline_data.get("timestamp", 0)
-    if isinstance(timestamp, bool) or not isinstance(timestamp, (int, float)) or not math.isfinite(timestamp):
+    if not _is_finite_number(timestamp):
         timestamp = 0
     else:
         timestamp = int(timestamp)
@@ -144,15 +162,20 @@ def parse_project(payload: Any) -> dict[str, Any]:
             raise ValueError("graph_positionsの形式が不正です。")
         for axis in ("x", "y"):
             value = point.get(axis)
-            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            if not _is_finite_number(value):
                 raise ValueError(f"graph_positions.{entity_id}.{axis}は有限数である必要があります。")
 
     normalized_ignored = []
     for signature in ignored:
         if (isinstance(signature, list) and len(signature) == 4
-                and isinstance(signature[0], int) and not isinstance(signature[0], bool)
+                and not isinstance(signature[0], bool)
+                and isinstance(signature[0], (int, float))
+                and _is_finite_number(signature[0])
+                and (not isinstance(signature[0], float) or signature[0].is_integer())
                 and all(isinstance(part, str) for part in signature[1:])):
-            normalized_ignored.append(tuple(signature))
+            # JavaScript Number.isInteger accepts JSON values such as 3.0;
+            # normalize to int so Desktop and Web retain the same signature shape.
+            normalized_ignored.append((int(signature[0]), *signature[1:]))
     return {
         "text": text,
         "events": events,
