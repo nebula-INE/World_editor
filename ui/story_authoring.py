@@ -241,7 +241,7 @@ class StoryAuthoringDialog(QDialog):
         c=self._chapter()
         if not c:return
         if QMessageBox.question(self,"章を削除","この章と配下のシーン・本文を削除しますか？") != QMessageBox.Yes:return
-        self.story=delete_chapter(self.story,c["id"]); self._mark_dirty(); self.current_chapter_id=None; self.current_scene_id=None; self._refresh_chapters(); self._set_status("章を削除しました。")
+        self.story=delete_chapter(self.story,c["id"]); self._mark_dirty(); self.current_chapter_id=self.story["chapters"][0]["id"] if self.story["chapters"] else None; self.current_scene_id=self.story["chapters"][0]["scenes"][0]["id"] if self.story["chapters"] and self.story["chapters"][0]["scenes"] else None; self._refresh_chapters(self.current_chapter_id); self._set_status("章を削除しました。")
     def move_chapter(self, delta: int) -> None:
         c=self._chapter()
         if not c:return
@@ -255,7 +255,7 @@ class StoryAuthoringDialog(QDialog):
         s=self._scene()
         if not s:return
         if QMessageBox.question(self,"シーンを削除","このシーンの本文を削除しますか？") != QMessageBox.Yes:return
-        self.story=delete_scene(self.story,s["id"]); self._mark_dirty(); self.current_scene_id=None; self._refresh_scenes(); self._set_status("シーンを削除しました。")
+        self.story=delete_scene(self.story,s["id"]); self._mark_dirty(); c=self._chapter(); self.current_scene_id=c["scenes"][0]["id"] if c and c["scenes"] else None; self._refresh_scenes(self.current_scene_id); self._set_status("シーンを削除しました。")
     def move_scene(self, delta: int) -> None:
         s=self._scene()
         if not s:return
