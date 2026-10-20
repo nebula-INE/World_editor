@@ -206,7 +206,9 @@ class StoryAuthoringDialog(QDialog):
     def _chapter_selected(self, row: int) -> None:
         if self._loading:return
         c=self.story["chapters"]; self.current_chapter_id=c[row]["id"] if 0<=row<len(c) else None
-        self.current_scene_id=None; self._refresh_scenes()
+        chapter = c[row] if 0<=row<len(c) else None
+        self.current_scene_id = chapter["scenes"][0]["id"] if chapter and chapter["scenes"] else None
+        self._refresh_scenes(self.current_scene_id)
     def _scene_selected(self, row: int) -> None:
         if self._loading:return
         c=self._chapter(); scenes=c["scenes"] if c else []
