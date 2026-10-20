@@ -9,7 +9,7 @@ class StoryContractTests(unittest.TestCase):
         cls.fixture=json.loads((Path(__file__).parent/"fixtures"/"axral-story-v1.json").read_text(encoding="utf-8"))
     def test_round_trip_preserves_japanese_ids_order_and_newlines(self):
         self.assertEqual(json.loads(serialize_story(parse_story(self.fixture))),self.fixture)
-        self.assertIn("\\n",self.fixture["chapters"][0]["scenes"][0]["blocks"][2]["text"])
+        self.assertIn("\n",self.fixture["chapters"][0]["scenes"][0]["blocks"][2]["text"])
     def test_unknown_version_rejected(self):
         with self.assertRaisesRegex(ValueError,"未対応"): parse_story(dict(self.fixture,schema_version=99))
     def test_duplicate_ids_and_bad_order_rejected(self):
