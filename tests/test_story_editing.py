@@ -52,7 +52,7 @@ class StoryEditingTests(unittest.TestCase):
 
         story = update_block(
             story, first_id,
-            {"type": "dialogue", "text": "「こんにちは。\\nまた会えたね。」", "character_id": "char_mio"},
+            {"type": "dialogue", "text": "「こんにちは。\nまた会えたね。」", "character_id": "char_mio"},
         )
         story = reorder_block(story, first_id, len(scene["blocks"]) - 1)
         story = delete_block(story, second_id)
@@ -61,7 +61,7 @@ class StoryEditingTests(unittest.TestCase):
         restored_scene = restored["chapters"][0]["scenes"][0]
         edited = next(block for block in restored_scene["blocks"] if block["id"] == first_id)
         self.assertEqual(edited["type"], "dialogue")
-        self.assertEqual(edited["text"], "「こんにちは。\\nまた会えたね。」")
+        self.assertEqual(edited["text"], "「こんにちは。\nまた会えたね。」")
         self.assertEqual(edited["character_id"], "char_mio")
         self.assertNotIn(second_id, [block["id"] for block in restored_scene["blocks"]])
         self.assertEqual([b["order"] for b in restored_scene["blocks"]], list(range(len(restored_scene["blocks"]))))
