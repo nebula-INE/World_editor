@@ -14,6 +14,18 @@ class StoryContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"未対応"): parse_story(dict(self.fixture,schema_version=99))
     def test_boolean_schema_version_rejected(self):
         with self.assertRaisesRegex(ValueError,"未対応"): parse_story(dict(self.fixture,schema_version=True))
+    def test_non_string_kind_rejected_as_validation_error(self):
+        for invalid_kind in ([], {}, 1, None):
+            with self.subTest(kind=invalid_kind):
+                with self.assertRaisesRegex(ValueError, "kindは対応"):
+                    parse_story(dict(self.fixture, kind=invalid_kind))
+    def test_non_string_block_type_rejected_as_validation_error(self):
+        for invalid_type in ([], {}, 1, None):
+            with self.subTest(block_type=invalid_type):
+                bad=json.loads(json.dumps(self.fixture))
+                bad["chapters"][0]["scenes"][0]["blocks"][0]["type"]=invalid_type
+                with self.assertRaisesRegex(ValueError, "ブロック種別"):
+                    parse_story(bad)
     def test_duplicate_ids_and_bad_order_rejected(self):
         bad=json.loads(json.dumps(self.fixture)); bad["chapters"][0]["scenes"][0]["blocks"][1]["id"]="block_001"
         with self.assertRaisesRegex(ValueError,"重複"): parse_story(bad)
