@@ -14,6 +14,11 @@ class StoryContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"未対応"): parse_story(dict(self.fixture,schema_version=99))
     def test_boolean_schema_version_rejected(self):
         with self.assertRaisesRegex(ValueError,"未対応"): parse_story(dict(self.fixture,schema_version=True))
+    def test_non_integer_schema_version_rejected(self):
+        for version in (1.0, "1", None):
+            with self.subTest(version=version):
+                with self.assertRaisesRegex(ValueError, "未対応"):
+                    parse_story(dict(self.fixture, schema_version=version))
     def test_non_string_kind_rejected_as_validation_error(self):
         for invalid_kind in ([], {}, 1, None):
             with self.subTest(kind=invalid_kind):
