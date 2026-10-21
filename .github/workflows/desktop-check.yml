@@ -13,6 +13,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Install Qt system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -24,4 +28,13 @@ jobs:
       - name: Test Story Authoring contract
         run: python -m unittest discover -s tests -p 'test_story_contract.py'
       - name: Test Python unit suite
+        env:
+          AXRAL_CROSSLOAD_OUTPUT_DIR: ${{ github.workspace }}/cross-load-output
         run: python -m unittest discover -s tests
+      - name: Upload Desktop-generated project for cross-load verification
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-roundtrip-axral-json
+          path: cross-load-output/desktop-roundtrip.axral.json
+          if-no-files-found: error
+          retention-days: 7

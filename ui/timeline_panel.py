@@ -146,6 +146,8 @@ class TimelinePanel(QWidget):
         layer_box = QGroupBox("Layer Slider (§13)")
         layer_layout = QHBoxLayout(layer_box)
         self._layer_checks: dict[str, QCheckBox] = {}
+        # Preserve the project-file order for round-trip compatibility.
+        self._project_visible_layer_order = list(LAYER_HIERARCHY)
         for layer_name in LAYER_HIERARCHY:
             cb = QCheckBox(layer_name)
             cb.setChecked(True)
@@ -192,10 +194,21 @@ class TimelinePanel(QWidget):
             self.event_list.addItem(item)
 
     def export_project_state(self) -> dict:
+        visible = self.visible_layers()
+        # Keep loaded order, including unknown layer names that this UI cannot
+        # toggle, and append newly enabled known layers in hierarchy order.
+        ordered = [
+            name for name in self._project_visible_layer_order
+            if name in visible or name not in self._layer_checks
+        ]
+        ordered.extend(
+            name for name in LAYER_HIERARCHY
+            if name in visible and name not in ordered
+        )
         return {
             "mode": self.is_timeline_mode(),
             "timestamp": self.current_timestamp(),
-            "visible_layers": sorted(self.visible_layers()),
+            "visible_layers": ordered,
         }
 
     def restore_project_state(self, state: dict) -> None:
@@ -214,6 +227,9 @@ class TimelinePanel(QWidget):
 
         visible = state.get("visible_layers", LAYER_HIERARCHY)
         if isinstance(visible, list):
+            self._project_visible_layer_order = [
+                name for name in visible if isinstance(name, str)
+            ]
             visible_set = set(visible)
             for name, checkbox in self._layer_checks.items():
                 checkbox.blockSignals(True)
@@ -239,6 +255,7 @@ class TimelinePanel(QWidget):
             checkbox.blockSignals(True)
             checkbox.setChecked(True)
             checkbox.blockSignals(False)
+        self._project_visible_layer_order = list(LAYER_HIERARCHY)
 
         self.set_events([])
         self.set_change_summary("")
