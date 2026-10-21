@@ -27,7 +27,7 @@ def parse_story(payload: Any) -> dict[str, Any]:
     if doc.get("format") != STORY_FORMAT: raise ValueError("Axral Story形式ではありません。")
     version = doc.get("schema_version")
     # bool is a subclass of int in Python, so True must not be accepted as version 1.
-    if isinstance(version, bool) or version != STORY_SCHEMA_VERSION:
+    if isinstance(version, bool) or not isinstance(version, int) or version != STORY_SCHEMA_VERSION:
         raise ValueError(f"未対応のAxral Story schema_versionです: {version!r}")
     _str(doc.get("work_id"), "work_id"); _str(doc.get("title"), "title")
     kind = doc.get("kind")
