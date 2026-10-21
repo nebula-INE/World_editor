@@ -298,7 +298,7 @@ class StoryAuthoringDialog(QDialog):
         if not path:return
         try:
             self.story=load_story_file(path); self._saved_snapshot=serialize_story(self.story); self._dirty=False; self.current_chapter_id=self.story["chapters"][0]["id"] if self.story["chapters"] else None
-            self.current_scene_id=None; self._loading=True; self.title_edit.setText(self.story["title"]); self.kind_combo.setCurrentIndex(self.kind_combo.findData(self.story["kind"])); self._loading=False
+            self.current_scene_id=self.story["chapters"][0]["scenes"][0]["id"] if self.story["chapters"] and self.story["chapters"][0]["scenes"] else None; self._loading=True; self.title_edit.setText(self.story["title"]); self.kind_combo.setCurrentIndex(self.kind_combo.findData(self.story["kind"])); self._loading=False
             self._refresh_chapters(self.current_chapter_id); self._set_status(f"読み込みました: {Path(path).name}")
         except (ValueError,OSError) as exc: QMessageBox.warning(self,"物語ファイルを開けません",str(exc))
     def save_story(self) -> None:
