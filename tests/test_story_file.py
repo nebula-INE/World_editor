@@ -20,6 +20,9 @@ class StoryFileIOTests(unittest.TestCase):
             path = Path(directory) / ("sample" + STORY_FILE_SUFFIX)
             saved = save_story_file(path, self.fixture)
             self.assertEqual(saved, path)
+            serialized = path.read_text(encoding="utf-8")
+            self.assertTrue(serialized.endswith("\n"), "serialized story file must end with a newline")
+            self.assertIn("夜。雨", serialized)
             self.assertEqual(load_story_file(path), self.fixture)
 
     def test_invalid_story_does_not_replace_existing_file(self):
