@@ -50,6 +50,13 @@ class DesktopProjectUiRoundTripTests(unittest.TestCase):
         saved_path = Path(self.temp_dir.name) / "desktop-roundtrip.axral.json"
         saved = self._save(saved_path)
         self.assertEqual(saved, self.fixture)
+        output_dir = os.environ.get("AXRAL_CROSSLOAD_OUTPUT_DIR")
+        if output_dir:
+            output_path = Path(output_dir)
+            output_path.mkdir(parents=True, exist_ok=True)
+            (output_path / "desktop-roundtrip.axral.json").write_text(
+                json.dumps(saved, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            )
 
     def test_malformed_project_does_not_replace_open_document_or_state(self):
         self._open(self.fixture_path)
