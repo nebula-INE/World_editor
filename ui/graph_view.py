@@ -136,10 +136,13 @@ class EdgeItem:
         target_node: NodeItem,
         relation: Relation,
         graph_view: "GraphView",
+        label_offset: float = 0.0,
     ) -> None:
         self.source_node = source_node
         self.target_node = target_node
         self.relation = relation
+        # Offset parallel relation labels perpendicular to their shared edge.
+        self.label_offset = label_offset
 
         self.path_item = QGraphicsPathItem()
         self.path_item.setZValue(0)
@@ -194,9 +197,12 @@ class EdgeItem:
         self.arrow_item.setPath(arrow_path)
 
         mid = QPointF((start.x() + end.x()) / 2, (start.y() + end.y()) / 2)
+        if length > 0 and self.label_offset:
+            # Spread labels for multiple relations between the same two nodes.
+            mid += QPointF(-dy / length * self.label_offset, dx / length * self.label_offset)
+        self.label_item.setText(self.relation.type)
         rect = self.label_item.boundingRect()
         self.label_item.setPos(mid.x() - rect.width() / 2, mid.y() - rect.height() / 2)
-        self.label_item.setText(self.relation.type)
 
 
 class GraphView(QGraphicsView):
@@ -269,14 +275,27 @@ class GraphView(QGraphicsView):
             self._node_items[entity.id] = node
 
         visible_ids = {e.id for e in entities}
-        for relation in model.relations.values():
-            if relation.source not in visible_ids or relation.target not in visible_ids:
-                continue
-            src = self._node_items.get(relation.source)
-            tgt = self._node_items.get(relation.target)
-            if src is None or tgt is None:
-                continue
-            EdgeItem(self._scene, src, tgt, relation, self)
+        visible_relations = [
+            relation for relation in model.relations.values()
+            if relation.source in visible_ids and relation.target in visible_ids
+        ]
+        # Relations sharing the same pair of nodes otherwise draw their labels
+        # at exactly the same midpoint. Spread only those labels; edge geometry
+        # and model data remain unchanged.
+        relation_groups: dict[tuple[str, str], list] = {}
+        for relation in visible_relations:
+            pair = tuple(sorted((relation.source, relation.target)))
+            relation_groups.setdefault(pair, []).append(relation)
+
+        for group in relation_groups.values():
+            count = len(group)
+            offsets = [(index - (count - 1) / 2) * 18.0 for index in range(count)]
+            for relation, label_offset in zip(group, offsets):
+                src = self._node_items.get(relation.source)
+                tgt = self._node_items.get(relation.target)
+                if src is None or tgt is None:
+                    continue
+                EdgeItem(self._scene, src, tgt, relation, self, label_offset=label_offset)
 
         self._scene.setSceneRect(self._scene.itemsBoundingRect().adjusted(-40, -40, 40, 40))
         if not self._has_fit:
