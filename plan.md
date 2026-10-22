@@ -1807,3 +1807,41 @@ For every phase:
 The first implementation slice should be **Phase A plus a minimal Phase B design**, not an immediate rewrite of the parser, world-state engine, graph, timeline, or save/export paths. First settle the authoring schema, persistence boundary, and shared test fixtures. Then implement the smallest useful outline-and-writing workflow on both platforms.
 
 Out of scope for the first slice: AI-generated full stories, automatic rewriting, a complete visual novel runtime, and a broad refactor of existing project serialization or export behavior.
+
+# 30. Cross-Platform Project Round-Trip Release Gate (2026-10-22)
+
+This section applies to both `World_editor_web` and `World_editor (Desktop)`. It is a validation gate, not permission to refactor the existing save/load/export handlers.
+
+## 30.1 Confirmed Contract
+
+- The shared `.axral.json` v1 fixture is byte-for-byte equivalent in both repositories and covers Japanese text, Event metadata/effects, graph positions, Timeline state/layer order, and ignored-candidate signatures.
+- The fixture is the common baseline; each platform must preserve every field it does not explicitly own or edit.
+- `.axral-story.json` remains separate from the existing world-project format.
+- Existing v1 files must continue to open and save without schema changes. Invalid input must show an error and leave the currently open project intact.
+- Contradiction detection/Linter findings remain advisory and non-destructive: do not delete facts or silently resolve apparent contradictions.
+
+## 30.2 Current Validation Work
+
+- Web PR #37 adds a UI-level open → save → reopen → save assertion over the complete fixture, plus a full-project preservation assertion after rejecting malformed input.
+- Desktop PR #38 adds Qt UI open/save assertions over the same fixture, malformed-input state-preservation coverage, and preserves loaded layer order (including unknown layer names) during serialization.
+- These are validation changes. Their existence alone does not establish that the PRs are merged, that current CI is green, or that actual Web-saved files have been opened in Desktop and vice versa.
+
+## 30.3 Required Release Checks
+
+1. Confirm the latest CI result for each corresponding PR and investigate any failing or skipped checks.
+2. Verify full UI round trips on each platform: open v1 → save → reopen → save; compare the complete JSON payload, not only the text field.
+3. Verify malformed/unsupported-version input does not replace or damage the currently open project.
+4. Perform actual cross-platform file checks in both directions: Web-generated file → Desktop open/save, and Desktop-generated file → Web open/save. Compare all supported fields, including Unicode text, IDs/references, ordering, optional/empty values, Timeline data, graph positions, and ignored candidates.
+5. Keep the known UI limitation explicit: a platform may not expose a field in its controls, but it must not silently discard that field when re-saving a file.
+6. Do not mark the persistence/parity work complete until checks 1–4 have evidence recorded. A shared fixture or a successful build alone is not proof of cross-platform interoperability.
+
+## 30.4 Platform-Specific Checks
+
+- **Web:** run the production TypeScript/Vite build and Playwright UI project-round-trip test; confirm browser download/open behavior and recovery after an invalid file.
+- **Desktop:** run Python compilation and the complete unittest suite under the supported Qt/offscreen setup; confirm native file-dialog open/save behavior and recovery after an invalid file.
+- **Both:** keep project serialization changes isolated from unrelated editor, graph, Timeline, and export refactors. Any discovered mismatch should receive a narrow regression test before a fix is considered.
+
+## 30.5 Next Safe Slice
+
+Finish validation of the existing persistence changes first. Then add/execute the two-direction cross-platform file checks and record any field-level mismatch. Do not start the authoring-model persistence work or change the `.axral.json` v1 schema until this gate is satisfied.
+
