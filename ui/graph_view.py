@@ -108,6 +108,19 @@ class EdgeLabelItem(QGraphicsSimpleTextItem):
         self.setCursor(Qt.PointingHandCursor)
         self.setToolTip("関係ラベルをダブルクリックして編集できます。変更は本文を直接上書きせず、Generated Relations の PATCH として提案されます。")
 
+    def boundingRect(self):
+        # Reserve a small margin for the background so labels remain readable over edges.
+        return super().boundingRect().adjusted(-4, -2, 4, 2)
+
+    def paint(self, painter, option, widget=None) -> None:
+        # A quiet backing separates the text from crossing relation lines.
+        painter.save()
+        painter.setPen(QPen(Qt.NoPen))
+        painter.setBrush(QBrush(QColor(255, 255, 255, 225)))
+        painter.drawRoundedRect(self.boundingRect(), 3, 3)
+        painter.restore()
+        super().paint(painter, option, widget)
+
     def mouseDoubleClickEvent(self, event) -> None:  # noqa: N802 (Qt override)
         self._view.request_relation_edit(self._edge)
         event.accept()
