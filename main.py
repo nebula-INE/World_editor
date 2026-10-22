@@ -233,30 +233,30 @@ class MainWindow(QMainWindow):
     # ---- Menu -------------------------------------------------------
 
     def _build_menu(self) -> None:
-        file_menu = self.menuBar().addMenu("File")
+        file_menu = self.menuBar().addMenu("ファイル")
 
-        open_action = file_menu.addAction("Open Codex Text...")
+        open_action = file_menu.addAction("Codexテキストを開く...")
         open_action.triggered.connect(self._open_text)
 
-        save_action = file_menu.addAction("Save Codex Text...")
+        save_action = file_menu.addAction("Codexテキストを保存...")
         save_action.triggered.connect(self._save_text)
 
-        project_open_action = file_menu.addAction("Open Axral Project...")
+        project_open_action = file_menu.addAction("Axralプロジェクトを開く...")
         project_open_action.triggered.connect(self._open_project)
-        project_save_action = file_menu.addAction("Save Axral Project...")
+        project_save_action = file_menu.addAction("Axralプロジェクトを保存...")
         project_save_action.triggered.connect(self._save_project)
 
         file_menu.addSeparator()
 
-        export_action = file_menu.addAction("Export Canonical Data (JSON)...")
+        export_action = file_menu.addAction("Canonical DataをJSONに書き出す...")
         export_action.triggered.connect(self._export_json)
 
         file_menu.addSeparator()
-        story_action = file_menu.addAction("Story Authoring...")
+        story_action = file_menu.addAction("ストーリー編集...")
         story_action.triggered.connect(self._open_story_authoring)
 
-        patches_menu = self.menuBar().addMenu("Patches")
-        resolve_action = patches_menu.addAction("Resolve Conflicts...")
+        patches_menu = self.menuBar().addMenu("変更提案")
+        resolve_action = patches_menu.addAction("矛盾を解決...")
         resolve_action.triggered.connect(self._resolve_conflicts)
 
         # Make secondary work areas discoverable and show/hide-able from the menu.
@@ -280,7 +280,7 @@ class MainWindow(QMainWindow):
         dialog.exec()
 
     def _open_text(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Open Codex Text", "", "Text (*.txt *.md)")
+        path, _ = QFileDialog.getOpenFileName(self, "Codexテキストを開く", "", "Text (*.txt *.md)")
         if not path:
             return
         if self.world_engine.events_sorted():
@@ -311,7 +311,7 @@ class MainWindow(QMainWindow):
         self.graph_view.reset_layout()
 
     def _save_text(self) -> None:
-        path, _ = QFileDialog.getSaveFileName(self, "Save Codex Text", "", "Text (*.txt *.md)")
+        path, _ = QFileDialog.getSaveFileName(self, "Codexテキストを保存", "", "Text (*.txt *.md)")
         if not path:
             return
         with open(path, "w", encoding="utf-8") as f:
