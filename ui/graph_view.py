@@ -347,3 +347,22 @@ class GraphView(QGraphicsView):
         if not new_type or new_type == relation.type:
             return
         self.relation_type_edit_requested.emit(relation.ref_key, relation.type, new_type)
+
+    def wheelEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        """Ctrl+ホイールでキャンバスを拡大・縮小する。通常のホイール操作は従来どおり。"""
+        if not (event.modifiers() & Qt.ControlModifier):
+            super().wheelEvent(event)
+            return
+
+        delta = event.angleDelta().y()
+        if not delta:
+            event.accept()
+            return
+
+        current_scale = self.transform().m11()
+        target_scale = current_scale * (1.15 ** (delta / 120.0))
+        target_scale = max(0.2, min(4.0, target_scale))
+        factor = target_scale / current_scale
+        if factor != 1.0:
+            self.scale(factor, factor)
+        event.accept()
