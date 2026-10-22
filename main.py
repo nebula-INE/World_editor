@@ -260,15 +260,15 @@ class MainWindow(QMainWindow):
         resolve_action.triggered.connect(self._resolve_conflicts)
 
         # Make secondary work areas discoverable and show/hide-able from the menu.
-        view_menu = self.menuBar().addMenu("View")
+        view_menu = self.menuBar().addMenu("表示")
         timeline_action = self.timeline_dock.toggleViewAction()
-        timeline_action.setText("Timeline Panel")
+        timeline_action.setText("タイムラインパネル")
         view_menu.addAction(timeline_action)
         linter_action = self.linter_dock.toggleViewAction()
-        linter_action.setText("Linter / Issues Panel")
+        linter_action.setText("矛盾・問題パネル")
         view_menu.addAction(linter_action)
 
-        fit_graph_action = view_menu.addAction("Fit Graph to View")
+        fit_graph_action = view_menu.addAction("グラフ全体を表示")
         fit_graph_action.setShortcut("Ctrl+0")
         fit_graph_action.setToolTip("グラフ全体が見えるように表示倍率と位置を調整します。データは変更しません。")
         fit_graph_action.triggered.connect(self.graph_view.fit_graph_to_view)
