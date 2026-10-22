@@ -95,6 +95,7 @@ from PySide6.QtWidgets import (
     QDockWidget,
     QFileDialog,
     QInputDialog,
+    QLabel,
     QMainWindow,
     QMessageBox,
     QPlainTextEdit,
@@ -200,6 +201,16 @@ class MainWindow(QMainWindow):
 
         self.status = QStatusBar()
         self.setStatusBar(self.status)
+        # Keep the core graph gestures discoverable without opening help.
+        self.graph_help = QLabel(
+            "操作: ノードをドラッグして配置 / 関係ラベルをダブルクリックして編集（変更はPATCHとして提案）"
+        )
+        self.graph_help.setObjectName("graphOperationHelp")
+        self.graph_help.setToolTip(
+            "ノードの配置変更は本文やCanonical Dataを書き換えません。"
+            "関係ラベルの編集はGenerated RelationsへのPATCHとして提案されます。"
+        )
+        self.status.addPermanentWidget(self.graph_help, 1)
 
         self._debounce = QTimer(self)
         self._debounce.setSingleShot(True)
