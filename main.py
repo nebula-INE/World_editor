@@ -203,7 +203,7 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.status)
         # Keep the core graph gestures discoverable without opening help.
         self.graph_help = QLabel(
-            "操作: ノードをドラッグして配置 / 関係ラベルをダブルクリックして編集（変更はPATCHとして提案）"
+            "操作: ノードをドラッグして配置 / Ctrl+ホイールで拡大・縮小 / 関係ラベルをダブルクリックして編集（変更はPATCHとして提案）"
         )
         self.graph_help.setObjectName("graphOperationHelp")
         self.graph_help.setToolTip(
