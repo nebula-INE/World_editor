@@ -227,6 +227,8 @@ class GraphView(QGraphicsView):
         # Entity単位のドラッグ位置。再描画(render_model)をまたいで保持する。
         self._positions: dict[str, QPointF] = {}
         self._has_fit = False
+        self._pan_start = None
+        self._pan_scroll_start = None
 
     def render_model(self, model, visible_layers: set[str] | None = None) -> None:
         """
@@ -380,6 +382,35 @@ class GraphView(QGraphicsView):
         if not new_type or new_type == relation.type:
             return
         self.relation_type_edit_requested.emit(relation.ref_key, relation.type, new_type)
+
+    def mousePressEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        """Middle-button drag pans the canvas without interfering with node dragging."""
+        if event.button() == Qt.MiddleButton:
+            self._pan_start = event.position().toPoint()
+            self._pan_scroll_start = (self.horizontalScrollBar().value(), self.verticalScrollBar().value())
+            self.viewport().setCursor(Qt.ClosedHandCursor)
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        if self._pan_start is not None and (event.buttons() & Qt.MiddleButton):
+            delta = event.position().toPoint() - self._pan_start
+            horizontal, vertical = self._pan_scroll_start
+            self.horizontalScrollBar().setValue(horizontal - delta.x())
+            self.verticalScrollBar().setValue(vertical - delta.y())
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        if event.button() == Qt.MiddleButton and self._pan_start is not None:
+            self._pan_start = None
+            self._pan_scroll_start = None
+            self.viewport().unsetCursor()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
 
     def wheelEvent(self, event) -> None:  # noqa: N802 (Qt override)
         """Ctrl+ホイールでキャンバスを拡大・縮小する。通常のホイール操作は従来どおり。"""
