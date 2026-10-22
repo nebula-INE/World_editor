@@ -79,6 +79,12 @@ class NodeItem(QGraphicsEllipseItem):
         self.setCursor(Qt.OpenHandCursor)
 
     def itemChange(self, change, value):
+        if change == QGraphicsItem.ItemSelectedHasChanged:
+            # Make selection obvious without changing the entity's layer color.
+            if value:
+                self.setPen(QPen(QColor("#2563EB"), 3.0))
+            else:
+                self.setPen(QPen(QColor("#222222"), 1.5))
         if change == QGraphicsItem.ItemPositionHasChanged:
             for edge in self.edges:
                 edge.update_path()
