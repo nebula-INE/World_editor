@@ -178,15 +178,19 @@ class MainWindow(QMainWindow):
         self.timeline_panel.add_event_requested.connect(self._add_event)
         self.timeline_panel.event_removed.connect(self._remove_event)
 
-        timeline_dock = QDockWidget("Timeline Lens (Phase 3, §14)", self)
+        timeline_dock = QDockWidget("Timeline", self)
+        timeline_dock.setObjectName("timelineDock")
         timeline_dock.setWidget(self.timeline_panel)
         self.addDockWidget(Qt.BottomDockWidgetArea, timeline_dock)
+        self.timeline_dock = timeline_dock
 
         self.linter_panel = LinterPanel()
         self.linter_panel.issue_activated.connect(self._jump_to_line)
-        linter_dock = QDockWidget("Worldbuilding Linter (Phase 4, §15)", self)
+        linter_dock = QDockWidget("Linter / Issues", self)
+        linter_dock.setObjectName("linterDock")
         linter_dock.setWidget(self.linter_panel)
         self.addDockWidget(Qt.BottomDockWidgetArea, linter_dock)
+        self.linter_dock = linter_dock
         self.tabifyDockWidget(timeline_dock, linter_dock)
         timeline_dock.raise_()
 
@@ -243,6 +247,15 @@ class MainWindow(QMainWindow):
         patches_menu = self.menuBar().addMenu("Patches")
         resolve_action = patches_menu.addAction("Resolve Conflicts...")
         resolve_action.triggered.connect(self._resolve_conflicts)
+
+        # Make secondary work areas discoverable and show/hide-able from the menu.
+        view_menu = self.menuBar().addMenu("View")
+        timeline_action = self.timeline_dock.toggleViewAction()
+        timeline_action.setText("Timeline Panel")
+        view_menu.addAction(timeline_action)
+        linter_action = self.linter_dock.toggleViewAction()
+        linter_action.setText("Linter / Issues Panel")
+        view_menu.addAction(linter_action)
 
     def _open_story_authoring(self) -> None:
         # Story files use their own dialog and .axral-story.json persistence.
