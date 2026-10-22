@@ -311,6 +311,18 @@ class GraphView(QGraphicsView):
         self._scene.clear()
         self._has_fit = False
 
+    def fit_graph_to_view(self) -> None:
+        """現在表示できるグラフ全体をビュー内に収める。データは変更しない。"""
+        bounds = self._scene.itemsBoundingRect()
+        if not bounds.isValid() or bounds.isNull():
+            return
+        bounds = bounds.adjusted(-40, -40, 40, 40)
+        self._scene.setSceneRect(bounds)
+        self.fitInView(bounds, Qt.KeepAspectRatio)
+        # Explicit fit is a view operation; subsequent live re-renders should
+        # preserve the user's chosen zoom rather than forcing another fit.
+        self._has_fit = True
+
     def _remember_position(self, entity_id: str, pos: QPointF) -> None:
         self._positions[entity_id] = QPointF(pos)
 
