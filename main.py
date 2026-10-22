@@ -141,26 +141,35 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Axral Codex - MVP1 (Explicit Text -> Graph)")
-        self.resize(1200, 760)
+        self.resize(1360, 820)
+        self.setMinimumSize(1120, 680)
 
         self.editor = QPlainTextEdit()
         self.editor.setPlainText(SAMPLE_TEXT)
         self.editor.setStyleSheet("font-family: Menlo, Consolas, monospace; font-size: 13px;")
+        self.editor.setMinimumWidth(280)
 
         self.graph_view = GraphView()
+        self.graph_view.setMinimumWidth(380)
         self.graph_view.relation_type_edit_requested.connect(self._edit_relation_type)
 
         self.candidate_panel = CandidatePanel()
-        self.candidate_panel.setMinimumWidth(320)
+        self.candidate_panel.setMinimumWidth(260)
         self.candidate_panel.candidate_accepted.connect(self._accept_candidate)
         self.candidate_panel.candidate_ignored.connect(self._ignore_candidate)
 
-        splitter = QSplitter()
-        splitter.addWidget(self.editor)
-        splitter.addWidget(self.graph_view)
-        splitter.addWidget(self.candidate_panel)
-        splitter.setSizes([440, 620, 320])
-        self.setCentralWidget(splitter)
+        # Keep the three primary work areas usable at startup and when resizing.
+        self.main_splitter = QSplitter(Qt.Horizontal)
+        self.main_splitter.setHandleWidth(6)
+        self.main_splitter.setChildrenCollapsible(False)
+        self.main_splitter.addWidget(self.editor)
+        self.main_splitter.addWidget(self.graph_view)
+        self.main_splitter.addWidget(self.candidate_panel)
+        self.main_splitter.setStretchFactor(0, 3)
+        self.main_splitter.setStretchFactor(1, 5)
+        self.main_splitter.setStretchFactor(2, 2)
+        self.main_splitter.setSizes([380, 650, 330])
+        self.setCentralWidget(self.main_splitter)
 
         self.timeline_panel = TimelinePanel()
         self.timeline_panel.timestamp_changed.connect(self._on_timeline_changed)
