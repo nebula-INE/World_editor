@@ -214,6 +214,8 @@ class GraphView(QGraphicsView):
         self.setScene(self._scene)
         self.setRenderHint(QPainter.Antialiasing)
         self.setDragMode(QGraphicsView.RubberBandDrag)
+        # Keep the point under the cursor stable while zooming the canvas.
+        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
 
         self._node_items: dict[str, NodeItem] = {}
         # Entity単位のドラッグ位置。再描画(render_model)をまたいで保持する。
