@@ -100,6 +100,7 @@ class EdgeLabelItem(QGraphicsSimpleTextItem):
         self.setZValue(3)
         self.setAcceptHoverEvents(True)
         self.setCursor(Qt.PointingHandCursor)
+        self.setToolTip("関係ラベルをダブルクリックして編集できます。変更は本文を直接上書きせず、Generated Relations の PATCH として提案されます。")
 
     def mouseDoubleClickEvent(self, event) -> None:  # noqa: N802 (Qt override)
         self._view.request_relation_edit(self._edge)
@@ -238,6 +239,7 @@ class GraphView(QGraphicsView):
 
         for entity in entities:
             node = NodeItem(entity.id, on_move=self._remember_position)
+            node.setToolTip(f"{entity.name}（{entity.type}）\nドラッグして配置を調整できます。本文やCanonical Dataは直接変更されません。")
             node.setBrush(QBrush(LAYER_COLORS.get(entity.type, LAYER_COLORS["Unknown"])))
             node.setPen(QPen(QColor("#222222"), 1.5))
             node.setPos(self._positions[entity.id])
