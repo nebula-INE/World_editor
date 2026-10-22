@@ -268,6 +268,11 @@ class MainWindow(QMainWindow):
         linter_action.setText("Linter / Issues Panel")
         view_menu.addAction(linter_action)
 
+        fit_graph_action = view_menu.addAction("Fit Graph to View")
+        fit_graph_action.setShortcut("Ctrl+0")
+        fit_graph_action.setToolTip("グラフ全体が見えるように表示倍率と位置を調整します。データは変更しません。")
+        fit_graph_action.triggered.connect(self.graph_view.fit_graph_to_view)
+
     def _open_story_authoring(self) -> None:
         # Story files use their own dialog and .axral-story.json persistence.
         # Existing world-project open/save/export handlers remain unchanged.
