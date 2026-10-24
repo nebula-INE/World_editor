@@ -71,11 +71,15 @@ class CandidateRow(QFrame):
         layout.addWidget(source_label)
 
         btn_row = QHBoxLayout()
-        accept_btn = QPushButton("Accept")
+        accept_btn = QPushButton("採用")
+        accept_btn.setToolTip("候補を確定し、Generated Relations に構文を追記します。既存の本文は置き換えません。")
+        accept_btn.setAccessibleName("候補を採用")
         accept_btn.setStyleSheet("QPushButton { background:#3B9E56; color:white; padding:4px 10px; }")
         accept_btn.clicked.connect(lambda: self.accepted.emit(self.candidate.id))
 
-        ignore_btn = QPushButton("Ignore")
+        ignore_btn = QPushButton("無視")
+        ignore_btn.setToolTip("このセッション中は候補一覧から隠します。本文やCanonical Dataは変更しません。")
+        ignore_btn.setAccessibleName("候補を無視")
         ignore_btn.setStyleSheet("QPushButton { background:#4A4E55; color:white; padding:4px 10px; }")
         ignore_btn.clicked.connect(lambda: self.ignored.emit(self.candidate.id))
 
@@ -86,7 +90,7 @@ class CandidateRow(QFrame):
 
 
 class CandidatePanel(QScrollArea):
-    """Candidate一覧を表示し、Accept/Ignoreをシグナルで上位に伝える。"""
+    """候補一覧を表示し、採用・無視の操作をシグナルで上位に伝える。"""
 
     candidate_accepted = Signal(str)
     candidate_ignored = Signal(str)

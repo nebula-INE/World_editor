@@ -95,6 +95,7 @@ from PySide6.QtWidgets import (
     QDockWidget,
     QFileDialog,
     QInputDialog,
+    QLabel,
     QMainWindow,
     QMessageBox,
     QPlainTextEdit,
@@ -141,26 +142,35 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Axral Codex - MVP1 (Explicit Text -> Graph)")
-        self.resize(1200, 760)
+        self.resize(1360, 820)
+        self.setMinimumSize(1120, 680)
 
         self.editor = QPlainTextEdit()
         self.editor.setPlainText(SAMPLE_TEXT)
         self.editor.setStyleSheet("font-family: Menlo, Consolas, monospace; font-size: 13px;")
+        self.editor.setMinimumWidth(280)
 
         self.graph_view = GraphView()
+        self.graph_view.setMinimumWidth(380)
         self.graph_view.relation_type_edit_requested.connect(self._edit_relation_type)
 
         self.candidate_panel = CandidatePanel()
-        self.candidate_panel.setMinimumWidth(320)
+        self.candidate_panel.setMinimumWidth(260)
         self.candidate_panel.candidate_accepted.connect(self._accept_candidate)
         self.candidate_panel.candidate_ignored.connect(self._ignore_candidate)
 
-        splitter = QSplitter()
-        splitter.addWidget(self.editor)
-        splitter.addWidget(self.graph_view)
-        splitter.addWidget(self.candidate_panel)
-        splitter.setSizes([440, 620, 320])
-        self.setCentralWidget(splitter)
+        # Keep the three primary work areas usable at startup and when resizing.
+        self.main_splitter = QSplitter(Qt.Horizontal)
+        self.main_splitter.setHandleWidth(6)
+        self.main_splitter.setChildrenCollapsible(False)
+        self.main_splitter.addWidget(self.editor)
+        self.main_splitter.addWidget(self.graph_view)
+        self.main_splitter.addWidget(self.candidate_panel)
+        self.main_splitter.setStretchFactor(0, 3)
+        self.main_splitter.setStretchFactor(1, 5)
+        self.main_splitter.setStretchFactor(2, 2)
+        self.main_splitter.setSizes([380, 650, 330])
+        self.setCentralWidget(self.main_splitter)
 
         self.timeline_panel = TimelinePanel()
         self.timeline_panel.timestamp_changed.connect(self._on_timeline_changed)
@@ -169,15 +179,19 @@ class MainWindow(QMainWindow):
         self.timeline_panel.add_event_requested.connect(self._add_event)
         self.timeline_panel.event_removed.connect(self._remove_event)
 
-        timeline_dock = QDockWidget("Timeline Lens (Phase 3, §14)", self)
+        timeline_dock = QDockWidget("Timeline", self)
+        timeline_dock.setObjectName("timelineDock")
         timeline_dock.setWidget(self.timeline_panel)
         self.addDockWidget(Qt.BottomDockWidgetArea, timeline_dock)
+        self.timeline_dock = timeline_dock
 
         self.linter_panel = LinterPanel()
         self.linter_panel.issue_activated.connect(self._jump_to_line)
-        linter_dock = QDockWidget("Worldbuilding Linter (Phase 4, §15)", self)
+        linter_dock = QDockWidget("Linter / Issues", self)
+        linter_dock.setObjectName("linterDock")
         linter_dock.setWidget(self.linter_panel)
         self.addDockWidget(Qt.BottomDockWidgetArea, linter_dock)
+        self.linter_dock = linter_dock
         self.tabifyDockWidget(timeline_dock, linter_dock)
         timeline_dock.raise_()
 
@@ -187,6 +201,16 @@ class MainWindow(QMainWindow):
 
         self.status = QStatusBar()
         self.setStatusBar(self.status)
+        # Keep the core graph gestures discoverable without opening help.
+        self.graph_help = QLabel(
+            "操作: ノードをドラッグして配置 / Ctrl+ホイールで拡大・縮小 / 関係ラベルをダブルクリックして編集（変更はPATCHとして提案）"
+        )
+        self.graph_help.setObjectName("graphOperationHelp")
+        self.graph_help.setToolTip(
+            "ノードの配置変更は本文やCanonical Dataを書き換えません。"
+            "関係ラベルの編集はGenerated RelationsへのPATCHとして提案されます。"
+        )
+        self.status.addPermanentWidget(self.graph_help, 1)
 
         self._debounce = QTimer(self)
         self._debounce.setSingleShot(True)
@@ -209,31 +233,45 @@ class MainWindow(QMainWindow):
     # ---- Menu -------------------------------------------------------
 
     def _build_menu(self) -> None:
-        file_menu = self.menuBar().addMenu("File")
+        file_menu = self.menuBar().addMenu("ファイル")
 
-        open_action = file_menu.addAction("Open Codex Text...")
+        open_action = file_menu.addAction("Codexテキストを開く...")
         open_action.triggered.connect(self._open_text)
 
-        save_action = file_menu.addAction("Save Codex Text...")
+        save_action = file_menu.addAction("Codexテキストを保存...")
         save_action.triggered.connect(self._save_text)
 
-        project_open_action = file_menu.addAction("Open Axral Project...")
+        project_open_action = file_menu.addAction("Axralプロジェクトを開く...")
         project_open_action.triggered.connect(self._open_project)
-        project_save_action = file_menu.addAction("Save Axral Project...")
+        project_save_action = file_menu.addAction("Axralプロジェクトを保存...")
         project_save_action.triggered.connect(self._save_project)
 
         file_menu.addSeparator()
 
-        export_action = file_menu.addAction("Export Canonical Data (JSON)...")
+        export_action = file_menu.addAction("Canonical DataをJSONに書き出す...")
         export_action.triggered.connect(self._export_json)
 
         file_menu.addSeparator()
-        story_action = file_menu.addAction("Story Authoring...")
+        story_action = file_menu.addAction("ストーリー編集...")
         story_action.triggered.connect(self._open_story_authoring)
 
-        patches_menu = self.menuBar().addMenu("Patches")
-        resolve_action = patches_menu.addAction("Resolve Conflicts...")
+        patches_menu = self.menuBar().addMenu("変更提案")
+        resolve_action = patches_menu.addAction("矛盾を解決...")
         resolve_action.triggered.connect(self._resolve_conflicts)
+
+        # Make secondary work areas discoverable and show/hide-able from the menu.
+        view_menu = self.menuBar().addMenu("表示")
+        timeline_action = self.timeline_dock.toggleViewAction()
+        timeline_action.setText("タイムラインパネル")
+        view_menu.addAction(timeline_action)
+        linter_action = self.linter_dock.toggleViewAction()
+        linter_action.setText("矛盾・問題パネル")
+        view_menu.addAction(linter_action)
+
+        fit_graph_action = view_menu.addAction("グラフ全体を表示")
+        fit_graph_action.setShortcut("Ctrl+0")
+        fit_graph_action.setToolTip("グラフ全体が見えるように表示倍率と位置を調整します。データは変更しません。")
+        fit_graph_action.triggered.connect(self.graph_view.fit_graph_to_view)
 
     def _open_story_authoring(self) -> None:
         # Story files use their own dialog and .axral-story.json persistence.
@@ -242,7 +280,7 @@ class MainWindow(QMainWindow):
         dialog.exec()
 
     def _open_text(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Open Codex Text", "", "Text (*.txt *.md)")
+        path, _ = QFileDialog.getOpenFileName(self, "Codexテキストを開く", "", "Text (*.txt *.md)")
         if not path:
             return
         if self.world_engine.events_sorted():
@@ -273,7 +311,7 @@ class MainWindow(QMainWindow):
         self.graph_view.reset_layout()
 
     def _save_text(self) -> None:
-        path, _ = QFileDialog.getSaveFileName(self, "Save Codex Text", "", "Text (*.txt *.md)")
+        path, _ = QFileDialog.getSaveFileName(self, "Codexテキストを保存", "", "Text (*.txt *.md)")
         if not path:
             return
         with open(path, "w", encoding="utf-8") as f:

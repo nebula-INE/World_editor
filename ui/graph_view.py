@@ -79,6 +79,12 @@ class NodeItem(QGraphicsEllipseItem):
         self.setCursor(Qt.OpenHandCursor)
 
     def itemChange(self, change, value):
+        if change == QGraphicsItem.ItemSelectedHasChanged:
+            # Make selection obvious without changing the entity's layer color.
+            if value:
+                self.setPen(QPen(QColor("#2563EB"), 3.0))
+            else:
+                self.setPen(QPen(QColor("#222222"), 1.5))
         if change == QGraphicsItem.ItemPositionHasChanged:
             for edge in self.edges:
                 edge.update_path()
@@ -100,6 +106,20 @@ class EdgeLabelItem(QGraphicsSimpleTextItem):
         self.setZValue(3)
         self.setAcceptHoverEvents(True)
         self.setCursor(Qt.PointingHandCursor)
+        self.setToolTip("関係ラベルをダブルクリックして編集できます。変更は本文を直接上書きせず、Generated Relations の PATCH として提案されます。")
+
+    def boundingRect(self):
+        # Reserve a small margin for the background so labels remain readable over edges.
+        return super().boundingRect().adjusted(-4, -2, 4, 2)
+
+    def paint(self, painter, option, widget=None) -> None:
+        # A quiet backing separates the text from crossing relation lines.
+        painter.save()
+        painter.setPen(QPen(Qt.NoPen))
+        painter.setBrush(QBrush(QColor(255, 255, 255, 225)))
+        painter.drawRoundedRect(self.boundingRect(), 3, 3)
+        painter.restore()
+        super().paint(painter, option, widget)
 
     def mouseDoubleClickEvent(self, event) -> None:  # noqa: N802 (Qt override)
         self._view.request_relation_edit(self._edge)
@@ -116,10 +136,13 @@ class EdgeItem:
         target_node: NodeItem,
         relation: Relation,
         graph_view: "GraphView",
+        label_offset: float = 0.0,
     ) -> None:
         self.source_node = source_node
         self.target_node = target_node
         self.relation = relation
+        # Offset parallel relation labels perpendicular to their shared edge.
+        self.label_offset = label_offset
 
         self.path_item = QGraphicsPathItem()
         self.path_item.setZValue(0)
@@ -174,9 +197,12 @@ class EdgeItem:
         self.arrow_item.setPath(arrow_path)
 
         mid = QPointF((start.x() + end.x()) / 2, (start.y() + end.y()) / 2)
+        if length > 0 and self.label_offset:
+            # Spread labels for multiple relations between the same two nodes.
+            mid += QPointF(-dy / length * self.label_offset, dx / length * self.label_offset)
+        self.label_item.setText(self.relation.type)
         rect = self.label_item.boundingRect()
         self.label_item.setPos(mid.x() - rect.width() / 2, mid.y() - rect.height() / 2)
-        self.label_item.setText(self.relation.type)
 
 
 class GraphView(QGraphicsView):
@@ -194,11 +220,15 @@ class GraphView(QGraphicsView):
         self.setScene(self._scene)
         self.setRenderHint(QPainter.Antialiasing)
         self.setDragMode(QGraphicsView.RubberBandDrag)
+        # Keep the point under the cursor stable while zooming the canvas.
+        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
 
         self._node_items: dict[str, NodeItem] = {}
         # Entity単位のドラッグ位置。再描画(render_model)をまたいで保持する。
         self._positions: dict[str, QPointF] = {}
         self._has_fit = False
+        self._pan_start = None
+        self._pan_scroll_start = None
 
     def render_model(self, model, visible_layers: set[str] | None = None) -> None:
         """
@@ -238,6 +268,7 @@ class GraphView(QGraphicsView):
 
         for entity in entities:
             node = NodeItem(entity.id, on_move=self._remember_position)
+            node.setToolTip(f"{entity.name}（{entity.type}）\nドラッグして配置を調整できます。本文やCanonical Dataは直接変更されません。")
             node.setBrush(QBrush(LAYER_COLORS.get(entity.type, LAYER_COLORS["Unknown"])))
             node.setPen(QPen(QColor("#222222"), 1.5))
             node.setPos(self._positions[entity.id])
@@ -246,14 +277,27 @@ class GraphView(QGraphicsView):
             self._node_items[entity.id] = node
 
         visible_ids = {e.id for e in entities}
-        for relation in model.relations.values():
-            if relation.source not in visible_ids or relation.target not in visible_ids:
-                continue
-            src = self._node_items.get(relation.source)
-            tgt = self._node_items.get(relation.target)
-            if src is None or tgt is None:
-                continue
-            EdgeItem(self._scene, src, tgt, relation, self)
+        visible_relations = [
+            relation for relation in model.relations.values()
+            if relation.source in visible_ids and relation.target in visible_ids
+        ]
+        # Relations sharing the same pair of nodes otherwise draw their labels
+        # at exactly the same midpoint. Spread only those labels; edge geometry
+        # and model data remain unchanged.
+        relation_groups: dict[tuple[str, str], list] = {}
+        for relation in visible_relations:
+            pair = tuple(sorted((relation.source, relation.target)))
+            relation_groups.setdefault(pair, []).append(relation)
+
+        for group in relation_groups.values():
+            count = len(group)
+            offsets = [(index - (count - 1) / 2) * 18.0 for index in range(count)]
+            for relation, label_offset in zip(group, offsets):
+                src = self._node_items.get(relation.source)
+                tgt = self._node_items.get(relation.target)
+                if src is None or tgt is None:
+                    continue
+                EdgeItem(self._scene, src, tgt, relation, self, label_offset=label_offset)
 
         self._scene.setSceneRect(self._scene.itemsBoundingRect().adjusted(-40, -40, 40, 40))
         if not self._has_fit:
@@ -287,6 +331,18 @@ class GraphView(QGraphicsView):
         self._node_items.clear()
         self._scene.clear()
         self._has_fit = False
+
+    def fit_graph_to_view(self) -> None:
+        """現在表示できるグラフ全体をビュー内に収める。データは変更しない。"""
+        bounds = self._scene.itemsBoundingRect()
+        if not bounds.isValid() or bounds.isNull():
+            return
+        bounds = bounds.adjusted(-40, -40, 40, 40)
+        self._scene.setSceneRect(bounds)
+        self.fitInView(bounds, Qt.KeepAspectRatio)
+        # Explicit fit is a view operation; subsequent live re-renders should
+        # preserve the user's chosen zoom rather than forcing another fit.
+        self._has_fit = True
 
     def _remember_position(self, entity_id: str, pos: QPointF) -> None:
         self._positions[entity_id] = QPointF(pos)
@@ -326,3 +382,51 @@ class GraphView(QGraphicsView):
         if not new_type or new_type == relation.type:
             return
         self.relation_type_edit_requested.emit(relation.ref_key, relation.type, new_type)
+
+    def mousePressEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        """Middle-button drag pans the canvas without interfering with node dragging."""
+        if event.button() == Qt.MiddleButton:
+            self._pan_start = event.position().toPoint()
+            self._pan_scroll_start = (self.horizontalScrollBar().value(), self.verticalScrollBar().value())
+            self.viewport().setCursor(Qt.ClosedHandCursor)
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        if self._pan_start is not None and (event.buttons() & Qt.MiddleButton):
+            delta = event.position().toPoint() - self._pan_start
+            horizontal, vertical = self._pan_scroll_start
+            self.horizontalScrollBar().setValue(horizontal - delta.x())
+            self.verticalScrollBar().setValue(vertical - delta.y())
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        if event.button() == Qt.MiddleButton and self._pan_start is not None:
+            self._pan_start = None
+            self._pan_scroll_start = None
+            self.viewport().unsetCursor()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    def wheelEvent(self, event) -> None:  # noqa: N802 (Qt override)
+        """Ctrl+ホイールでキャンバスを拡大・縮小する。通常のホイール操作は従来どおり。"""
+        if not (event.modifiers() & Qt.ControlModifier):
+            super().wheelEvent(event)
+            return
+
+        delta = event.angleDelta().y()
+        if not delta:
+            event.accept()
+            return
+
+        current_scale = self.transform().m11()
+        target_scale = current_scale * (1.15 ** (delta / 120.0))
+        target_scale = max(0.2, min(4.0, target_scale))
+        factor = target_scale / current_scale
+        if factor != 1.0:
+            self.scale(factor, factor)
+        event.accept()
